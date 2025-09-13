@@ -26,6 +26,7 @@ const impressumRouter = require('./routes/impressum.router');
 const homeRouter = require('./routes/home.router');
 const blogsRouter = require('./routes/blogs.router');
 const spendenRouter = require('./routes/spenden.router');
+const anfrageRouter = require('./routes/anfrage.router');
 
 
 app.use('/api/links', linksRouter);
@@ -38,6 +39,7 @@ app.use('/api/impressum', impressumRouter);
 app.use('/api/home', homeRouter);
 app.use('/api/blogs', blogsRouter);
 app.use('/api/spenden', spendenRouter);
+app.use('/api/anfrage', anfrageRouter);
 
 
 // Fehlerbehandlung

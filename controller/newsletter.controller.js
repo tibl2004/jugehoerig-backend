@@ -6,17 +6,14 @@ const cron = require('node-cron');
 const crypto = require('crypto'); // Für Token-Generierung
 const sharp = require('sharp');
 
-// Mail-Transporter vorbereiten (GMX)
+// Mail-Transporter für Gmail
 const transporter = nodemailer.createTransport({
-  host: 'mail.gmx.net',
-  port: 587,
-  secure: false,
+  service: 'gmail',
   auth: {
-    user: 'newsletter@jugehoerig.ch', // Ersetzen!
-    pass: '...',            // Ersetzen!
+    user: 'info@jugehoerig.ch', // Deine Gmail-Adresse
+    pass: 'juge!1234',      // Dein Gmail-App-Passwort, nicht dein normales Passwort
   },
 });
-
 const newsletterController = {
   // Authentifizierungsmiddleware
   authenticateToken: (req, res, next) => {
