@@ -25,9 +25,9 @@ const anfrageController = {
     try {
       // 1️⃣ Anfrage in DB speichern
       const [result] = await pool.query(
-        "INSERT INTO anfragen (name, email, nachricht, erstellt_am) VALUES (?, ?, ?, ?, NOW())",
+        "INSERT INTO anfragen (name, email, nachricht, erstellt_am) VALUES (?, ?, ?, NOW())",
         [name, email, nachricht]
-      );
+      );      
       const anfrageId = result.insertId;
 
       // 2️⃣ Mail an info@jugehoerig.ch
