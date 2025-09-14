@@ -6,7 +6,7 @@ const loginController = require('../controller/login.controller');
 router.post('/', loginController.login); // Login-Anmeldung
 
 router.put(
-  '/vorstand/change-password-erstlogin',
+  '/change-password-erstlogin',
   loginController.authenticateToken,
   loginController.changePasswordErstLogin
 );
