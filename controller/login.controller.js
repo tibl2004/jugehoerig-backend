@@ -3,11 +3,14 @@ const bcrypt = require('bcrypt');
 const pool = require('../database/index');
 
 const loginController = {
+  // Token prüfen
   authenticateToken: (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
-    if (!token) return res.status(401).json({ error: 'Kein Token bereitgestellt.' });
+    if (!token) {
+      return res.status(401).json({ error: 'Kein Token bereitgestellt.' });
+    }
 
     jwt.verify(token, 'secretKey', (err, user) => {
       if (err) {
@@ -19,6 +22,7 @@ const loginController = {
     });
   },
 
+  // Login
   login: async (req, res) => {
     try {
       const { benutzername, passwort } = req.body;
@@ -27,7 +31,7 @@ const loginController = {
         return res.status(400).json({ error: 'Benutzername und Passwort sind erforderlich.' });
       }
 
-      // Nur Tabelle vorstand prüfen
+      // Nur vorstand prüfen
       const [vorstandResult] = await pool.query(
         "SELECT * FROM vorstand WHERE benutzername = ?",
         [benutzername]
@@ -75,21 +79,31 @@ const loginController = {
   // Erst-Login Passwort ändern
   changePasswordErstLogin: async (req, res) => {
     try {
-      const userId = req.user.id;
+      const userId = req.user?.id;
       const { neuesPasswort } = req.body;
 
-      if (!neuesPasswort) {
-        return res.status(400).json({ error: 'Neues Passwort ist erforderlich.' });
+      if (!userId) {
+        return res.status(401).json({ error: 'Nicht autorisiert.' });
+      }
+
+      if (!neuesPasswort || neuesPasswort.trim().length < 6) {
+        return res.status(400).json({ error: 'Neues Passwort ist erforderlich und muss mindestens 6 Zeichen lang sein.' });
       }
 
       const hashedPassword = await bcrypt.hash(neuesPasswort, 10);
 
-      await pool.query(
+      const [result] = await pool.query(
         "UPDATE vorstand SET passwort = ?, passwort_geaendert = 1 WHERE id = ?",
         [hashedPassword, userId]
       );
 
-      res.status(200).json({ message: 'Passwort erfolgreich geändert. Jetzt normal einloggen.' });
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
+      }
+
+      res.status(200).json({ 
+        message: 'Passwort erfolgreich geändert. Bitte jetzt normal einloggen.' 
+      });
     } catch (error) {
       console.error('Fehler beim Passwort ändern:', error);
       res.status(500).json({ error: 'Passwort konnte nicht geändert werden.' });
