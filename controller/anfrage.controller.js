@@ -1,5 +1,6 @@
 const pool = require("../database/index");
 const nodemailer = require("nodemailer");
+const axios = require("axios"); // <-- DAS FEHLT
 
 // ✅ Gmail Transporter mit App-Passwort
 const transporter = nodemailer.createTransport({

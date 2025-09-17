@@ -392,3 +392,15 @@ getNextEventId: async (req, res) => {
 };
 
 module.exports = eventController;
+
+
+
+
+
+// Formulare
+router.post("/:id/formular", eventController.authenticateToken, eventController.createFormFields);
+router.get("/:id/formular", eventController.getFormFields);
+
+// Anmeldung
+router.post("/:id/anmelden", eventController.registerForEvent);
+router.get("/:id/anmeldungen", eventController.authenticateToken, eventController.getRegistrations);
