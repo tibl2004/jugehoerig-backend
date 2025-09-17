@@ -2,19 +2,24 @@ const pool = require("../database/index");
 const nodemailer = require("nodemailer");
 const axios = require("axios");
 
+
 const transporter = nodemailer.createTransport({
   host: "mail.gmx.net",
-  port: 465,        // SSL Port
-  secure: true,     // true für SSL
+  port: 587,          // TLS
+  secure: false,      // false für STARTTLS
   auth: {
-    user: "no.reply-jugehoerig@gmx.ch", 
-    pass: "AY6LYMRU4KL3D2EF3QX4", // dein App-Passwort
+    user: "no.reply-jugehoerig@gmx.ch",
+    pass: "AY6LYMRU4KL3D2EF3QX4",  // dein App-Passwort
+  },
+  tls: {
+    ciphers: "SSLv3",
+    rejectUnauthorized: false  // nur falls Node.js TLS Zertifikatprobleme hat
   },
 });
 
 // Verbindung testen
-transporter.verify((error, success) => {
-  if (error) console.error("SMTP Fehler:", error);
+transporter.verify((err, success) => {
+  if (err) console.error("SMTP Fehler:", err);
   else console.log("SMTP Verbindung erfolgreich!");
 });
 
