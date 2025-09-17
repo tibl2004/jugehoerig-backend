@@ -2,23 +2,16 @@ const pool = require("../database/index");
 const nodemailer = require("nodemailer");
 const axios = require("axios"); // <-- DAS FEHLT
 
-// Mail-Transporter vorbereiten (Gmail)
+// Mail-Transporter vorbereiten (GMX)
 const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,        // TLS
-  secure: false,    // false für TLS (STARTTLS)
+  host: 'mail.gmx.net',
+  port: 587,
+  secure: false,
   auth: {
-    user: "info@jugehoerig.ch",       // Dein Gmail
-    pass: "juge!1234",        // 16-stelliges Gmail App-Passwort
+      user: 'no.reply-jugehoerig@gmx.ch', // Ersetzen!
+      pass: 'jugehoerig!1234',   // Ersetzen!
   },
-  tls: {
-    rejectUnauthorized: false         // optional, falls Zertifikat-Fehler
-  },
-  logger: true,   // zeigt Infos in der Konsole
-  debug: true,    // zeigt SMTP-Kommunikation in der Konsole
 });
-
-
 const anfrageController = {
 
     createAnfrage: async (req, res) => {
