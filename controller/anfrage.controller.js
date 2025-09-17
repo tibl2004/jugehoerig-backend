@@ -1,17 +1,16 @@
 const pool = require("../database/index");
 const nodemailer = require("nodemailer");
 
-// Nodemailer Transporter konfigurieren (z.B. mit Gmail, SMTP-Server etc.)
+// ✅ Gmail Transporter mit App-Passwort
 const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com", // z.B. smtp.gmail.com
-  port: 465, // 465 für SSL oder 587 für TLS
-  secure: true, 
+  service: "gmail", // Gmail Shortcut, kein host/port nötig
   auth: {
     user: "info@jugehoerig.ch",
-    pass: 'juge!1234',      // Dein Gmail-App-Passwort, nicht dein normales Passwort
+    pass: "DEIN_APP_PASSWORT", // das 16-stellige App-Passwort von Google
   },
+  logger: true,   // zeigt Infos in der Konsole
+  debug: true,    // zeigt SMTP-Kommunikation in der Konsole
 });
-
 const anfrageController = {
 
     createAnfrage: async (req, res) => {
