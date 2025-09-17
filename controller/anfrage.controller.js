@@ -2,19 +2,24 @@ const pool = require("../database/index");
 const nodemailer = require("nodemailer");
 const axios = require("axios");
 
-// GMX Mail-Transporter (SSL)
+// GMX Mail-Transporter vorbereiten
 const transporter = nodemailer.createTransport({
-  host: 'mail.gmx.net',
-  port: 465,
-  secure: true, // SSL
+  host: "mail.gmx.net",
+  port: 465,      // SSL
+  secure: true,
   auth: {
-      user: 'no.reply-jugehoerig@gmx.ch',
-      pass: 'AY6LYMRU4KL3D2EF3QX4', // GMX App-Passwort oder korrektes Passwort
+    user: "no.reply-jugehoerig@gmx.ch", 
+    pass: "AY6LYMRU4KL3D2EF3QX4",  // <-- hier dein GMX App-Passwort einsetzen
   },
 });
 
-const anfrageController = {
+// Verbindung testen
+transporter.verify((error, success) => {
+  if (error) console.error("SMTP Fehler:", error);
+  else console.log("SMTP Verbindung erfolgreich!");
+});
 
+const anfrageController = {
   createAnfrage: async (req, res) => {
     const { name, email, nachricht } = req.body;
 
@@ -23,7 +28,7 @@ const anfrageController = {
     }
 
     try {
-      // 1️⃣ Anfrage speichern
+      // 1️⃣ Anfrage in DB speichern
       const [result] = await pool.query(
         "INSERT INTO anfragen (name, email, nachricht, erstellt_am) VALUES (?, ?, ?, NOW())",
         [name, email, nachricht]
@@ -65,7 +70,7 @@ const anfrageController = {
         `,
       };
 
-      // 4️⃣ Mail an Kunde (mit Hinweis, nicht zu antworten)
+      // 4️⃣ Mail an Kunde
       const mailAnKunde = {
         from: '"Jugehörig Website" <no.reply-jugehoerig@gmx.ch>',
         to: email,
@@ -78,13 +83,12 @@ const anfrageController = {
               </div>
               <div style="padding:30px; color:#333;">
                 <h2 style="color:#F59422;">Hallo ${name},</h2>
-                <p>Vielen Dank für Ihre Anfrage! Wir werden uns so schnell wie möglich bei Ihnen melden.</p>
+                <p>Vielen Dank für Ihre Anfrage! Wir melden uns so schnell wie möglich bei Ihnen.</p>
                 <p><strong>Ihre Nachricht:</strong></p>
                 <blockquote style="border-left:4px solid #F59422; padding-left:15px; color:#555;">${nachricht}</blockquote>
               </div>
               <div style="background:#f1f1f1; padding:15px; text-align:center; font-size:12px; color:#666;">
-                Bitte antworten Sie <strong>nicht</strong> auf diese E-Mail. Ihre Antwort wird nicht gelesen.<br>
-                Für Anliegen schreiben Sie bitte an: <strong>info@jugehoerig.ch</strong>.
+                Bitte antworten Sie <strong>nicht</strong> auf diese E-Mail. Für Anliegen schreiben Sie bitte an: <strong>info@jugehoerig.ch</strong>.
               </div>
               <div style="background:#f1f1f1; padding:20px; text-align:center; font-size:12px; color:#666;">
                 &copy; ${new Date().getFullYear()} Jugehörig
@@ -94,7 +98,7 @@ const anfrageController = {
         `,
       };
 
-      // 5️⃣ Mails senden
+      // 5️⃣ E-Mails senden
       await transporter.sendMail(mailAnInfo);
       await transporter.sendMail(mailAnKunde);
 
