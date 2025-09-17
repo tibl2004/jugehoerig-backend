@@ -9,7 +9,7 @@ const transporter = nodemailer.createTransport({
   secure: true, // SSL
   auth: {
       user: 'no.reply-jugehoerig@gmx.ch',
-      pass: 'DEIN_APP_PASSWORT_HIER', // GMX App-Passwort oder korrektes Passwort
+      pass: 'jugehoerig!1234', // GMX App-Passwort oder korrektes Passwort
   },
 });
 
