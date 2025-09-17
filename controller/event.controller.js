@@ -4,12 +4,12 @@ const sharp = require("sharp");
 
 const eventController = {
   authenticateToken: (req, res, next) => {
-    const authHeader = req.headers["authorization"];
-    const token = authHeader && authHeader.split(" ")[1];
-    if (!token) return res.status(401).json({ error: "Kein Token bereitgestellt." });
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'Kein Token bereitgestellt.' });
 
-    jwt.verify(token, "secretKey", (err, user) => {
-      if (err) return res.status(403).json({ error: "Ungültiger Token." });
+    jwt.verify(token, 'secretKey', (err, user) => {
+      if (err) return res.status(403).json({ error: 'Ungültiger Token.' });
       req.user = user;
       next();
     });
@@ -18,12 +18,15 @@ const eventController = {
   createEvent: async (req, res) => {
     let connection;
     try {
-      if (!req.user.userTypes || !req.user.userTypes.includes("vorstand")) {
-        return res
-          .status(403)
-          .json({ error: "Nur Benutzer mit Vorstandrechten dürfen ein Event erstellen." });
+      // Nur Vorstände dürfen Events erstellen
+      if (
+        !req.user.userTypes ||
+        !Array.isArray(req.user.userTypes) ||
+        !req.user.userTypes.includes("vorstand")
+      ) {
+        return res.status(403).json({ error: "Nur Benutzer mit Vorstandrechten dürfen ein Event erstellen." });
       }
-
+  
       const {
         titel,
         beschreibung,
@@ -34,55 +37,52 @@ const eventController = {
         supporter,
         bildtitel,
         preise,
-        bild,
+        bild // Erwartet als vollständiger Base64-String mit Präfix
       } = req.body;
-
+  
       if (!titel || !beschreibung || !ort || !von || !bis) {
-        return res
-          .status(400)
-          .json({ error: "Titel, Beschreibung, Ort, Von und Bis müssen angegeben werden." });
+        return res.status(400).json({ error: "Titel, Beschreibung, Ort, Von und Bis müssen angegeben werden." });
       }
-
-      // Bild prüfen & konvertieren
+  
+      // Falls Bild mitgeliefert wird, prüfe das Format und wandle es in PNG um
       let base64Bild = null;
       if (bild) {
         const matches = bild.match(/^data:(image\/[a-zA-Z]+);base64,(.+)$/);
         if (!matches || matches.length !== 3) {
-          return res.status(400).json({
-            error: "Ungültiges Bildformat. Erwarte Base64-String mit data:image/... Prefix.",
-          });
+          return res.status(400).json({ error: "Ungültiges Bildformat. Erwarte Base64-String mit data:image/... Prefix." });
         }
-
+  
         const mimeType = matches[1];
         const base64Data = matches[2];
         const buffer = Buffer.from(base64Data, "base64");
-
+  
+        // Nur bestimmte Formate zulassen
         if (!["image/png", "image/jpeg", "image/jpg", "image/webp"].includes(mimeType)) {
           return res.status(400).json({ error: "Nur PNG, JPEG, JPG oder WEBP erlaubt." });
         }
-
+  
         const convertedBuffer = await sharp(buffer).png().toBuffer();
-        base64Bild = convertedBuffer.toString("base64");
+        base64Bild = convertedBuffer.toString("base64"); // Reines Base64 ohne Prefix
       }
-
+  
       connection = await pool.getConnection();
       await connection.beginTransaction();
-
-      // Event speichern (immer mit Status = aktiv)
+  
+      // Event speichern
       const [eventResult] = await connection.query(
-        `INSERT INTO events (titel, beschreibung, ort, von, bis, bild, bildtitel, supporter, alle, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'aktiv')`,
+        `INSERT INTO events (titel, beschreibung, ort, von, bis, bild, bildtitel, supporter, alle)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [titel, beschreibung, ort, von, bis, base64Bild, bildtitel || null, supporter || null, alle ? 1 : 0]
       );
-
+  
       const eventId = eventResult.insertId;
-
+  
       // Preise hinzufügen
       if (Array.isArray(preise) && preise.length > 0) {
         const preisWerte = preise
-          .filter((p) => p.preisbeschreibung && p.kosten != null)
-          .map((p) => [eventId, p.preisbeschreibung, p.kosten]);
-
+          .filter(p => p.preisbeschreibung && p.kosten != null)
+          .map(p => [eventId, p.preisbeschreibung, p.kosten]);
+  
         if (preisWerte.length > 0) {
           await connection.query(
             `INSERT INTO event_preise (event_id, preisbeschreibung, kosten) VALUES ?`,
@@ -90,14 +90,12 @@ const eventController = {
           );
         }
       }
-
+  
       await connection.commit();
       res.status(201).json({ message: "Event erfolgreich erstellt." });
     } catch (error) {
       if (connection) {
-        try {
-          await connection.rollback();
-        } catch {}
+        try { await connection.rollback(); } catch {}
         connection.release();
       }
       console.error("Fehler beim Erstellen des Events:", error);
@@ -106,21 +104,16 @@ const eventController = {
       if (connection) connection.release();
     }
   },
-
+  
   getEvents: async (req, res) => {
     try {
-      // Abgelaufene Events automatisch beenden
-      await pool.query(`UPDATE events SET status = 'beendet' WHERE bis < NOW() AND status = 'aktiv'`);
-
-      const [events] = await pool.query(
-        `
-        SELECT e.id, e.titel, e.beschreibung, e.ort, e.von, e.bis, e.status, e.bild, e.alle, e.supporter,
+      const [events] = await pool.query(`
+        SELECT e.id, e.titel, e.beschreibung, e.ort, e.von, e.bis, e.bild, e.alle, e.supporter,
                p.id as preis_id, p.preisbeschreibung, p.kosten
         FROM events e
         LEFT JOIN event_preise p ON e.id = p.event_id
         ORDER BY e.von DESC
-      `
-      );
+      `);
 
       const grouped = {};
       for (const row of events) {
@@ -132,11 +125,10 @@ const eventController = {
             ort: row.ort,
             von: row.von,
             bis: row.bis,
-            status: row.status,
             bild: row.bild ? `data:image/png;base64,${row.bild}` : null,
             alle: !!row.alle,
             supporter: !!row.supporter,
-            preise: [],
+            preise: []
           };
         }
 
@@ -144,7 +136,7 @@ const eventController = {
           grouped[row.id].preise.push({
             id: row.preis_id,
             preisbeschreibung: row.preisbeschreibung,
-            kosten: row.kosten,
+            kosten: row.kosten
           });
         }
       }
@@ -160,22 +152,13 @@ const eventController = {
     try {
       const eventId = req.params.id;
 
-      // Prüfen ob Event abgelaufen ist → automatisch beenden
-      await pool.query(
-        `UPDATE events SET status = 'beendet' WHERE bis < NOW() AND id = ? AND status = 'aktiv'`,
-        [eventId]
-      );
-
-      const [events] = await pool.query(
-        `
-        SELECT e.id, e.titel, e.beschreibung, e.ort, e.von, e.bis, e.status, e.bild, e.alle, e.supporter,
+      const [events] = await pool.query(`
+        SELECT e.id, e.titel, e.beschreibung, e.ort, e.von, e.bis, e.bild, e.alle, e.supporter,
                p.id as preis_id, p.preisbeschreibung, p.kosten
         FROM events e
         LEFT JOIN event_preise p ON e.id = p.event_id
         WHERE e.id = ?
-      `,
-        [eventId]
-      );
+      `, [eventId]);
 
       if (events.length === 0) {
         return res.status(404).json({ error: "Event nicht gefunden." });
@@ -188,11 +171,10 @@ const eventController = {
         ort: events[0].ort,
         von: events[0].von,
         bis: events[0].bis,
-        status: events[0].status,
         bild: events[0].bild ? `data:image/png;base64,${events[0].bild}` : null,
         alle: !!events[0].alle,
         supporter: !!events[0].supporter,
-        preise: [],
+        preise: []
       };
 
       for (const row of events) {
@@ -200,7 +182,7 @@ const eventController = {
           event.preise.push({
             id: row.preis_id,
             preisbeschreibung: row.preisbeschreibung,
-            kosten: row.kosten,
+            kosten: row.kosten
           });
         }
       }
@@ -214,21 +196,19 @@ const eventController = {
 
   updateEvent: async (req, res) => {
     try {
-      if (!req.user.userTypes || !req.user.userTypes.includes("vorstand")) {
-        return res.status(403).json({ error: "Nur Vorstand darf Events bearbeiten." });
+      if (req.user.userType !== 'vorstand') {
+        return res.status(403).json({ error: 'Nur vorstands dürfen Events bearbeiten.' });
       }
 
       const eventId = req.params.id;
-      const { titel, beschreibung, ort, von, bis, alle, supporter, status } = req.body;
+      const { titel, beschreibung, ort, von, bis, alle, supporter } = req.body;
 
       let bildBase64 = null;
       if (req.body.bild) {
-        if (!req.body.bild.startsWith("data:image/png;base64,")) {
-          return res
-            .status(400)
-            .json({ error: "Bild muss als PNG im Base64-Format mit Prefix gesendet werden." });
+        if (!req.body.bild.startsWith('data:image/png;base64,')) {
+          return res.status(400).json({ error: 'Bild muss als PNG im Base64-Format mit Prefix gesendet werden.' });
         }
-        bildBase64 = req.body.bild.replace(/^data:image\/png;base64,/, "");
+        bildBase64 = req.body.bild.replace(/^data:image\/png;base64,/, '');
       }
 
       let sql = `UPDATE events SET titel = ?, beschreibung = ?, ort = ?, von = ?, bis = ?, alle = ?, supporter = ?`;
@@ -237,11 +217,6 @@ const eventController = {
       if (bildBase64 !== null) {
         sql += `, bild = ?`;
         params.push(bildBase64);
-      }
-
-      if (status) {
-        sql += `, status = ?`;
-        params.push(status);
       }
 
       sql += ` WHERE id = ?`;
@@ -258,8 +233,8 @@ const eventController = {
 
   deleteEvent: async (req, res) => {
     try {
-      if (!req.user.userTypes || !req.user.userTypes.includes("vorstand")) {
-        return res.status(403).json({ error: "Nur Vorstand darf Events löschen." });
+      if (req.user.userType !== 'vorstand') {
+        return res.status(403).json({ error: 'Nur vorstands dürfen Events löschen.' });
       }
 
       const eventId = req.params.id;
@@ -270,125 +245,7 @@ const eventController = {
       console.error("Fehler beim Löschen des Events:", error);
       res.status(500).json({ error: "Fehler beim Löschen des Events." });
     }
-  },
-
-  createFormFields: async (req, res) => {
-    try {
-      if (!req.user.userTypes || !req.user.userTypes.includes("vorstand")) {
-        return res.status(403).json({ error: "Nur Vorstand darf Formulare erstellen." });
-      }
-
-      const { eventId, felder } = req.body;
-
-      if (!eventId || !Array.isArray(felder)) {
-        return res.status(400).json({ error: "Event-ID und Felder müssen angegeben werden." });
-      }
-
-      await pool.query(`DELETE FROM event_formulare WHERE event_id = ?`, [eventId]);
-
-      if (felder.length > 0) {
-        const werte = felder.map((f) => [eventId, f.feldname, f.typ || "text", f.pflicht ? 1 : 0]);
-        await pool.query(
-          `INSERT INTO event_formulare (event_id, feldname, typ, pflicht) VALUES ?`,
-          [werte]
-        );
-      }
-
-      res.status(201).json({ message: "Formular erfolgreich erstellt." });
-    } catch (error) {
-      console.error("Fehler beim Erstellen des Formulars:", error);
-      res.status(500).json({ error: "Fehler beim Erstellen des Formulars." });
-    }
-  },
-
-  getFormFields: async (req, res) => {
-    try {
-      const eventId = req.params.id;
-      const [felder] = await pool.query(
-        `SELECT id, feldname, typ, pflicht FROM event_formulare WHERE event_id = ?`,
-        [eventId]
-      );
-      res.status(200).json(felder);
-    } catch (error) {
-      console.error("Fehler beim Laden des Formulars:", error);
-      res.status(500).json({ error: "Fehler beim Laden des Formulars." });
-    }
-  },
-
-  registerForEvent: async (req, res) => {
-    try {
-      const eventId = req.params.id;
-      const { vorname, nachname, daten } = req.body;
-
-      if (!vorname || !nachname) {
-        return res.status(400).json({ error: "Vorname und Nachname sind Pflichtfelder." });
-      }
-
-      const [felder] = await pool.query(
-        `SELECT feldname, pflicht FROM event_formulare WHERE event_id = ?`,
-        [eventId]
-      );
-
-      for (const feld of felder) {
-        if (feld.pflicht && (!daten || !daten[feld.feldname])) {
-          return res.status(400).json({ error: `Pflichtfeld fehlt: ${feld.feldname}` });
-        }
-      }
-
-      await pool.query(
-        `INSERT INTO event_anmeldungen (event_id, vorname, nachname, daten) VALUES (?, ?, ?, ?)`,
-        [eventId, vorname, nachname, JSON.stringify(daten || {})]
-      );
-
-      res.status(201).json({ message: "Anmeldung erfolgreich gespeichert." });
-    } catch (error) {
-      console.error("Fehler bei der Anmeldung:", error);
-      res.status(500).json({ error: "Fehler bei der Anmeldung." });
-    }
-  },
-
-  getRegistrations: async (req, res) => {
-    try {
-      if (!req.user.userTypes || !req.user.userTypes.includes("vorstand")) {
-        return res.status(403).json({ error: "Nur Vorstand darf Anmeldungen sehen." });
-      }
-
-      const eventId = req.params.id;
-      const [rows] = await pool.query(
-        `SELECT id, vorname, nachname, daten, created_at FROM event_anmeldungen WHERE event_id = ?`,
-        [eventId]
-      );
-
-      const result = rows.map((r) => ({
-        id: r.id,
-        vorname: r.vorname,
-        nachname: r.nachname,
-        daten: JSON.parse(r.daten || "{}"),
-        created_at: r.created_at,
-      }));
-
-      res.status(200).json(result);
-    } catch (error) {
-      console.error("Fehler beim Abrufen der Anmeldungen:", error);
-      res.status(500).json({ error: "Fehler beim Abrufen der Anmeldungen." });
-    }
-  },
-
-  // In deinem eventController
-getNextEventId: async (req, res) => {
-  try {
-    const [rows] = await pool.query(
-      `SELECT AUTO_INCREMENT as nextId
-       FROM information_schema.TABLES
-       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'events'`
-    );
-    res.status(200).json({ nextId: rows[0].nextId });
-  } catch (error) {
-    console.error("Fehler beim Holen der nächsten Event-ID:", error);
-    res.status(500).json({ error: "Fehler beim Holen der nächsten Event-ID." });
   }
-},
-
 };
 
 module.exports = eventController;
