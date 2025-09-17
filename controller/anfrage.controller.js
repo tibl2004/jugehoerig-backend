@@ -35,7 +35,7 @@ const anfrageController = {
     
           // 3️⃣ Mail an Admin
           const mailAnInfo = {
-            from: '"Jugehörig Website" <info@jugehoerig.ch>',
+            from: '"Jugehörig System" <no.reply-jugehoerig@gmx.ch>',
             to: "info@jugehoerig.ch",
             subject: `Neue Anfrage von ${name}`,
             html: `
@@ -76,9 +76,8 @@ const anfrageController = {
             `,
           };
     
-          // 4️⃣ Mail an Kunde
           const mailAnKunde = {
-            from: '"Jugehörig Website" <info@jugehoerig.ch>',
+            from: '"Jugehörig Website" <no.reply-jugehoerig@gmx.ch>',
             to: email,
             subject: "Ihre Anfrage wurde erfolgreich eingereicht",
             html: `
@@ -98,16 +97,23 @@ const anfrageController = {
                   <blockquote style="border-left:4px solid #F59422; padding-left:15px; color:#555;">${nachricht}</blockquote>
                   <p>Freundliche Grüße,<br>Ihr Jugehörig-Team</p>
                 </div>
-    
+          
+                <!-- Hinweis für nicht antworten -->
+                <div style="background-color:#f1f1f1; padding:15px; text-align:center; font-size:12px; color:#666;">
+                  Bitte antworten Sie **nicht** auf diese E-Mail. Ihre Antwort wird nicht gelesen. 
+                  Für Anliegen schreiben Sie bitte an: <strong>info@jugehoerig.ch</strong>.
+                </div>
+          
                 <!-- Footer -->
                 <div style="background-color:#f1f1f1; padding:20px; text-align:center; font-size:12px; color:#666;">
                   &copy; ${new Date().getFullYear()} Jugehörig. Alle Rechte vorbehalten.
                 </div>
-    
+          
               </div>
             </div>
             `,
           };
+          
     
           // 5️⃣ Mails verschicken
           await transporter.sendMail(mailAnInfo);
