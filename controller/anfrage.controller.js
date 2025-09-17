@@ -2,16 +2,16 @@ const pool = require("../database/index");
 const nodemailer = require("nodemailer");
 const axios = require("axios"); // <-- DAS FEHLT
 
-// Mail-Transporter vorbereiten (GMX)
 const transporter = nodemailer.createTransport({
   host: 'mail.gmx.net',
-  port: 587,
-  secure: false,
+  port: 465,        // 465 für SSL
+  secure: true,     // SSL aktivieren
   auth: {
-      user: 'no.reply-jugehoerig@gmx.ch', // Ersetzen!
-      pass: 'jugehoerig!1234',   // Ersetzen!
+      user: 'no.reply-jugehoerig@gmx.ch',
+      pass: 'jugehoerig!1234', // evtl. App-Passwort nötig
   },
 });
+
 const anfrageController = {
 
     createAnfrage: async (req, res) => {
