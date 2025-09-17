@@ -6,7 +6,7 @@ const transporter = nodemailer.createTransport({
   service: "gmail", // Gmail Shortcut, kein host/port nötig
   auth: {
     user: "info@jugehoerig.ch",
-    pass: "DEIN_APP_PASSWORT", // das 16-stellige App-Passwort von Google
+    pass: "juge!1234", // das 16-stellige App-Passwort von Google
   },
   logger: true,   // zeigt Infos in der Konsole
   debug: true,    // zeigt SMTP-Kommunikation in der Konsole
