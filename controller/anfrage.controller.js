@@ -2,15 +2,14 @@ const pool = require("../database/index");
 const nodemailer = require("nodemailer");
 const axios = require("axios");
 
-
 // Mail-Transporter vorbereiten (GMX)
 const transporter = nodemailer.createTransport({
-  host: 'mail.gmx.net',
+  host: "mail.gmx.net",
   port: 587,
-  secure: false,
+  secure: false, // STARTTLS
   auth: {
-      user: 'no.reply-jugehoerig@gmx.ch', // Ersetzen!
-      pass: 'jugehoerig!1234',   // Ersetzen!
+    user: "no.reply-jugehoerig@gmx.net",   // MUSS @gmx.net sein
+    pass: "jugehoerig!1234",               // Dein normales GMX Passwort
   },
 });
 
@@ -25,7 +24,9 @@ const anfrageController = {
     const { name, email, nachricht } = req.body;
 
     if (!name || !email || !nachricht) {
-      return res.status(400).json({ error: "Name, Email und Nachricht sind Pflichtfelder." });
+      return res
+        .status(400)
+        .json({ error: "Name, Email und Nachricht sind Pflichtfelder." });
     }
 
     try {
@@ -37,14 +38,17 @@ const anfrageController = {
       const anfrageId = result.insertId;
 
       // 2️⃣ Logo abrufen
-      const logoRes = await axios.get("https://jugehoerig-backend.onrender.com/api/logo");
+      const logoRes = await axios.get(
+        "https://jugehoerig-backend.onrender.com/api/logo"
+      );
       const logoUrl = logoRes.data.logoUrl;
 
       // 3️⃣ Mail an Admin
       const mailAnInfo = {
-        from: '"Jugehörig System" <no.reply-jugehoerig@gmx.ch>',
+        from: '"Jugehörig System" <no.reply-jugehoerig@gmx.net>', // Muss identisch mit auth.user sein
         to: "info@jugehoerig.ch",
         subject: `Neue Anfrage von ${name}`,
+        replyTo: "info@jugehoerig.ch", // Antworten gehen an deine Hauptadresse
         html: `
           <div style="font-family:Arial,sans-serif; padding:20px; background:#f9f9f9;">
             <div style="max-width:600px; margin:0 auto; background:#fff; border-radius:10px; overflow:hidden;">
@@ -73,9 +77,10 @@ const anfrageController = {
 
       // 4️⃣ Mail an Kunde
       const mailAnKunde = {
-        from: '"Jugehörig Website" <no.reply-jugehoerig@gmx.ch>',
+        from: '"Jugehörig Website" <no.reply-jugehoerig@gmx.net>', // Muss identisch mit auth.user sein
         to: email,
         subject: "Ihre Anfrage wurde erfolgreich eingereicht",
+        replyTo: "info@jugehoerig.ch",
         html: `
           <div style="font-family:Arial,sans-serif; padding:20px; background:#f9f9f9;">
             <div style="max-width:600px; margin:0 auto; background:#fff; border-radius:10px; overflow:hidden;">
@@ -105,18 +110,21 @@ const anfrageController = {
 
       return res.status(201).json({
         message: "Anfrage erfolgreich gespeichert und E-Mails verschickt.",
-        anfrageId
+        anfrageId,
       });
-
     } catch (err) {
       console.error("Fehler beim Erstellen der Anfrage:", err);
-      return res.status(500).json({ error: "Fehler beim Verarbeiten der Anfrage." });
+      return res
+        .status(500)
+        .json({ error: "Fehler beim Verarbeiten der Anfrage." });
     }
   },
 
   getAnfragen: async (req, res) => {
     try {
-      const [rows] = await pool.query("SELECT * FROM anfragen ORDER BY erstellt_am DESC");
+      const [rows] = await pool.query(
+        "SELECT * FROM anfragen ORDER BY erstellt_am DESC"
+      );
       res.json(rows);
     } catch (err) {
       console.error(err);
@@ -127,8 +135,11 @@ const anfrageController = {
   getAnfrageById: async (req, res) => {
     const { id } = req.params;
     try {
-      const [rows] = await pool.query("SELECT * FROM anfragen WHERE id=?", [id]);
-      if (!rows.length) return res.status(404).json({ error: "Anfrage nicht gefunden." });
+      const [rows] = await pool.query("SELECT * FROM anfragen WHERE id=?", [
+        id,
+      ]);
+      if (!rows.length)
+        return res.status(404).json({ error: "Anfrage nicht gefunden." });
       res.json(rows[0]);
     } catch (err) {
       console.error(err);
