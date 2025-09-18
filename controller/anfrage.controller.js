@@ -2,24 +2,34 @@ const pool = require("../database/index");
 const nodemailer = require("nodemailer");
 const axios = require("axios");
 
-// Mail-Transporter vorbereiten (GMX)
+// GMX Mail-Transporter vorbereiten
 const transporter = nodemailer.createTransport({
   host: "mail.gmx.net",
   port: 587,
   secure: false, // STARTTLS
   auth: {
-    user: "no.reply-jugehoerig@gmx.net",   // MUSS @gmx.net sein
-    pass: "jugehoerig!1234",               // Dein normales GMX Passwort
+    user: "no.reply-jugehoerig@gmx.net", // MUSS @gmx.net sein
+    pass: "jugehoerig!1234",             // dein normales Passwort
   },
 });
 
-// Verbindung testen
-transporter.verify((err, success) => {
-  if (err) console.error("SMTP Fehler:", err);
-  else console.log("SMTP Verbindung erfolgreich!");
-});
+// SMTP Testfunktion
+const testSmtpConnection = async (req, res) => {
+  try {
+    await transporter.verify();
+    res.status(200).json({ message: "SMTP-Verbindung erfolgreich hergestellt." });
+  } catch (error) {
+    console.error("SMTP-Verbindung fehlgeschlagen:", error);
+    res.status(500).json({
+      error: "SMTP-Verbindung fehlgeschlagen.",
+      details: error.message,
+    });
+  }
+};
 
 const anfrageController = {
+  testSmtpConnection,
+
   createAnfrage: async (req, res) => {
     const { name, email, nachricht } = req.body;
 
@@ -45,10 +55,10 @@ const anfrageController = {
 
       // 3️⃣ Mail an Admin
       const mailAnInfo = {
-        from: '"Jugehörig System" <no.reply-jugehoerig@gmx.net>', // Muss identisch mit auth.user sein
+        from: '"Jugehörig System" <no.reply-jugehoerig@gmx.net>',
         to: "info@jugehoerig.ch",
         subject: `Neue Anfrage von ${name}`,
-        replyTo: "info@jugehoerig.ch", // Antworten gehen an deine Hauptadresse
+        replyTo: "info@jugehoerig.ch",
         html: `
           <div style="font-family:Arial,sans-serif; padding:20px; background:#f9f9f9;">
             <div style="max-width:600px; margin:0 auto; background:#fff; border-radius:10px; overflow:hidden;">
@@ -77,7 +87,7 @@ const anfrageController = {
 
       // 4️⃣ Mail an Kunde
       const mailAnKunde = {
-        from: '"Jugehörig Website" <no.reply-jugehoerig@gmx.net>', // Muss identisch mit auth.user sein
+        from: '"Jugehörig Website" <no.reply-jugehoerig@gmx.net>',
         to: email,
         subject: "Ihre Anfrage wurde erfolgreich eingereicht",
         replyTo: "info@jugehoerig.ch",
@@ -135,9 +145,7 @@ const anfrageController = {
   getAnfrageById: async (req, res) => {
     const { id } = req.params;
     try {
-      const [rows] = await pool.query("SELECT * FROM anfragen WHERE id=?", [
-        id,
-      ]);
+      const [rows] = await pool.query("SELECT * FROM anfragen WHERE id=?", [id]);
       if (!rows.length)
         return res.status(404).json({ error: "Anfrage nicht gefunden." });
       res.json(rows[0]);
