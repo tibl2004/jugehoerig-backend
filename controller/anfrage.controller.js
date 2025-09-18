@@ -3,17 +3,14 @@ const nodemailer = require("nodemailer");
 const axios = require("axios");
 
 
+// Mail-Transporter vorbereiten (GMX)
 const transporter = nodemailer.createTransport({
-  host: "mail.gmx.net",
-  port: 587,          // TLS
-  secure: false,      // false für STARTTLS
+  host: 'mail.gmx.net',
+  port: 587,
+  secure: false,
   auth: {
-    user: "no.reply-jugehoerig@gmx.ch",
-    pass: "AY6LYMRU4KL3D2EF3QX4",  // dein App-Passwort
-  },
-  tls: {
-    ciphers: "SSLv3",
-    rejectUnauthorized: false  // nur falls Node.js TLS Zertifikatprobleme hat
+      user: 'no.reply-jugehoerig@gmx.ch', // Ersetzen!
+      pass: 'jugehoerig!1234',   // Ersetzen!
   },
 });
 
