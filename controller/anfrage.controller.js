@@ -4,17 +4,18 @@ const axios = require("axios");
 
 
 const transporter = nodemailer.createTransport({
-  host: "mail.hostpoint.ch",      // Hostpoint SMTP-Server
-  port: 587,                      // Port für STARTTLS
-  secure: false,                  // false = STARTTLS, true wäre SSL/465
+  host: "mail.hostpoint.ch",
+  port: 587,
+  secure: false, // STARTTLS
   auth: {
-    user: "info@jugehoerig.ch",   // deine Mailadresse bei Hostpoint
-    pass: "antoinette97!juge",    // das Hostpoint-Mailpasswort
+    user: "info@jugehoerig.ch",
+    pass: "antoinette97!juge",
   },
   tls: {
-    rejectUnauthorized: false,    // verhindert Zertifikatsfehler
+    rejectUnauthorized: false,
   },
 });
+
 
 // SMTP Testfunktion
 const testSmtpConnection = async (req, res) => {
