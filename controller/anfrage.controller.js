@@ -2,14 +2,12 @@ const pool = require("../database/index");
 const nodemailer = require("nodemailer");
 const axios = require("axios");
 
-// GMX Mail-Transporter vorbereiten
+// Mail-Transporter für Gmail
 const transporter = nodemailer.createTransport({
-  host: "mail.gmx.net",
-  port: 587,
-  secure: false, // STARTTLS
+  service: 'gmail',
   auth: {
-    user: "no.reply-jugehoerig@gmx.net", // MUSS @gmx.net sein
-    pass: "jugehoerig!1234",             // dein normales Passwort
+    user: 'info@jugehoerig.ch', // Deine Gmail-Adresse
+    pass: 'juge!1234',      // Dein Gmail-App-Passwort, nicht dein normales Passwort
   },
 });
 
