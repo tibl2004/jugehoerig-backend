@@ -2,7 +2,6 @@ const pool = require("../database/index");
 const nodemailer = require("nodemailer");
 const axios = require("axios");
 
-
 const transporter = nodemailer.createTransport({
   host: "mail.hostpoint.ch",
   port: 587,
@@ -16,8 +15,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-
-// SMTP Testfunktion
+// SMTP Test
 const testSmtpConnection = async (req, res) => {
   try {
     await transporter.verify();
@@ -44,14 +42,14 @@ const anfrageController = {
     }
 
     try {
-      // 1️⃣ Anfrage in DB speichern
+      // 1️⃣ Anfrage speichern
       const [result] = await pool.query(
         "INSERT INTO anfragen (name, email, nachricht, erstellt_am) VALUES (?, ?, ?, NOW())",
         [name, email, nachricht]
       );
       const anfrageId = result.insertId;
 
-      // 2️⃣ Logo abrufen
+      // 2️⃣ Logo holen
       const logoRes = await axios.get(
         "https://jugehoerig-backend.onrender.com/api/logo"
       );
@@ -59,10 +57,10 @@ const anfrageController = {
 
       // 3️⃣ Mail an Admin
       const mailAnInfo = {
-        from: '"Jugehörig System" <no.reply-jugehoerig@gmx.net>',
+        from: '"Jugehörig System" <info@jugehoerig.ch>',
         to: "info@jugehoerig.ch",
         subject: `Neue Anfrage von ${name}`,
-        replyTo: "info@jugehoerig.ch",
+        replyTo: email,
         html: `
           <div style="font-family:Arial,sans-serif; padding:20px; background:#f9f9f9;">
             <div style="max-width:600px; margin:0 auto; background:#fff; border-radius:10px; overflow:hidden;">
@@ -91,7 +89,7 @@ const anfrageController = {
 
       // 4️⃣ Mail an Kunde
       const mailAnKunde = {
-        from: '"Jugehörig Website" <no.reply-jugehoerig@gmx.net>',
+        from: '"Jugehörig Website" <info@jugehoerig.ch>',
         to: email,
         subject: "Ihre Anfrage wurde erfolgreich eingereicht",
         replyTo: "info@jugehoerig.ch",
@@ -118,7 +116,7 @@ const anfrageController = {
         `,
       };
 
-      // 5️⃣ E-Mails senden
+      // 5️⃣ Senden
       await transporter.sendMail(mailAnInfo);
       await transporter.sendMail(mailAnKunde);
 
