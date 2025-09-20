@@ -2,12 +2,17 @@ const pool = require("../database/index");
 const nodemailer = require("nodemailer");
 const axios = require("axios");
 
-// Mail-Transporter für Gmail
+
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: "mail.hostpoint.ch",      // Hostpoint SMTP-Server
+  port: 587,                      // Port für STARTTLS
+  secure: false,                  // false = STARTTLS, true wäre SSL/465
   auth: {
-    user: 'info@jugehoerig.ch', // Deine Gmail-Adresse
-    pass: 'juge!1234',      // Dein Gmail-App-Passwort, nicht dein normales Passwort
+    user: "info@jugehoerig.ch",   // deine Mailadresse bei Hostpoint
+    pass: "antoinette97!juge",    // das Hostpoint-Mailpasswort
+  },
+  tls: {
+    rejectUnauthorized: false,    // verhindert Zertifikatsfehler
   },
 });
 
