@@ -2,14 +2,15 @@ const express = require("express");
 const router = express.Router();
 const linksController = require("../controller/links.controller");
 
+// 📋 Alle Sections + Links abrufen
+router.get("/", linksController.getAllSectionsWithLinks);
 // 🔐 Middleware für Token-Authentifizierung
 router.use(linksController.authenticateToken);
 
 // 🆕 Neue Section mit Links erstellen
 router.post("/", linksController.createSectionWithLinks);
 
-// 📋 Alle Sections + Links abrufen
-router.get("/", linksController.getAllSectionsWithLinks);
+
 
 // ✏️ Nur Section-Titel ändern
 router.put("/title/:id", linksController.updateSectionTitle);
