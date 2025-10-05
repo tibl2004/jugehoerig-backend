@@ -12,7 +12,6 @@ router.get("/", anfrageController.getAnfragen);
 // Einzelne Anfrage nach ID abrufen
 router.get("/:id", anfrageController.getAnfrageById);
 
-// SMTP-Verbindung testen
-router.get("/test/smtp", anfrageController.testSmtpConnection);
+
 
 module.exports = router;
