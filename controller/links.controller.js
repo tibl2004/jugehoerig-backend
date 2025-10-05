@@ -2,6 +2,7 @@ const pool = require("../database/index");
 const jwt = require("jsonwebtoken");
 
 const linksController = {
+  // 🔐 Token prüfen
   authenticateToken: (req, res, next) => {
     const authHeader = req.headers["authorization"];
     const token = authHeader && authHeader.split(" ")[1];
@@ -18,6 +19,7 @@ const linksController = {
     });
   },
 
+  // 🆕 Neue Section + Links erstellen
   createSectionWithLinks: async (req, res) => {
     try {
       if (req.user.userType !== "vorstand") {
@@ -26,157 +28,259 @@ const linksController = {
 
       const { subtitle, links } = req.body;
 
-      if (!subtitle || !Array.isArray(links) || links.length === 0) {
-        return res.status(400).json({ error: "Untertitel und mindestens ein Link müssen angegeben werden." });
+      if (!subtitle) {
+        return res.status(400).json({ error: "Untertitel muss angegeben werden." });
       }
 
-      const insertSectionSql = "INSERT INTO content_sections (subtitle) VALUES (?)";
-      const [sectionResult] = await pool.query(insertSectionSql, [subtitle]);
+      const [sectionResult] = await pool.query("INSERT INTO content_sections (subtitle) VALUES (?)", [subtitle]);
       const sectionId = sectionResult.insertId;
 
-      const insertLinkSql = "INSERT INTO content_links (section_id, link_text, link_url) VALUES ?";
-      const linkValues = links.map((link) => [sectionId, link.text, link.url]);
-      await pool.query(insertLinkSql, [linkValues]);
+      if (Array.isArray(links) && links.length > 0) {
+        const linkValues = links.map((link) => [sectionId, link.text, link.url]);
+        await pool.query("INSERT INTO content_links (section_id, link_text, link_url) VALUES ?", [linkValues]);
+      }
 
-      res.status(201).json({ message: "Inhalt erfolgreich erstellt." });
+      res.status(201).json({ message: "Section erfolgreich erstellt.", sectionId });
     } catch (error) {
-      console.error("Fehler beim Erstellen des Inhalts:", error);
-      res.status(500).json({ error: "Fehler beim Erstellen des Inhalts." });
+      console.error("Fehler beim Erstellen der Section:", error);
+      res.status(500).json({ error: "Fehler beim Erstellen der Section." });
     }
   },
 
+  // 📋 Alle Sections + Links abrufen
   getAllSectionsWithLinks: async (req, res) => {
     try {
-      const [sections] = await pool.query("SELECT * FROM content_sections ORDER BY id");
-      const [links] = await pool.query("SELECT * FROM content_links ORDER BY id");
+      const [sections] = await pool.query("SELECT * FROM content_sections ORDER BY id ASC");
+      const [links] = await pool.query("SELECT * FROM content_links ORDER BY id ASC");
 
-      const sectionsWithLinks = sections.map((section) => ({
+      const result = sections.map((section) => ({
         id: section.id,
         subtitle: section.subtitle,
         links: links
-          .filter((link) => link.section_id === section.id)
-          .map((l) => ({
-            id: l.id,
-            text: l.link_text,
-            url: l.link_url,
-          })),
+          .filter((l) => l.section_id === section.id)
+          .map((l) => ({ id: l.id, text: l.link_text, url: l.link_url, position: l.position })),
       }));
 
-      res.json(sectionsWithLinks);
+      res.json(result);
     } catch (error) {
-      console.error("Fehler beim Abrufen der Inhalte:", error);
+      console.error("Fehler beim Abrufen:", error);
       res.status(500).json({ error: "Fehler beim Abrufen der Inhalte." });
     }
   },
 
-  updateSectionWithLinks: async (req, res) => {
+  // ✏️ Nur Section bearbeiten (Untertitel ändern)
+  updateSectionTitle: async (req, res) => {
     try {
-      if (req.user.userType !== "vorstand" && req.user.userType !== "admin") {
-        return res.status(403).json({ error: "Nur Admins oder Vorstände dürfen Inhalte aktualisieren." });
+      if (!["vorstand", "admin"].includes(req.user.userType)) {
+        return res.status(403).json({ error: "Nur Admins oder Vorstände dürfen Sections bearbeiten." });
       }
 
-      const sectionId = req.params.id;
-      const { subtitle, links } = req.body;
+      const { id } = req.params;
+      const { subtitle } = req.body;
 
-      if (!subtitle && !Array.isArray(links)) {
-        return res.status(400).json({ error: "Keine Änderungen übermittelt." });
+      if (!subtitle) {
+        return res.status(400).json({ error: "Neuer Untertitel fehlt." });
       }
 
-      if (subtitle) {
-        await pool.query("UPDATE content_sections SET subtitle = ? WHERE id = ?", [subtitle, sectionId]);
-      }
+      const [result] = await pool.query("UPDATE content_sections SET subtitle = ? WHERE id = ?", [subtitle, id]);
+      if (result.affectedRows === 0) return res.status(404).json({ error: "Section nicht gefunden." });
 
-      if (Array.isArray(links)) {
-        const [existingLinks] = await pool.query("SELECT id FROM content_links WHERE section_id = ?", [sectionId]);
-        const existingLinkIds = existingLinks.map((l) => l.id);
-        const sentLinkIds = links.filter((l) => l.id).map((l) => l.id);
-
-        const toDeleteIds = existingLinkIds.filter((id) => !sentLinkIds.includes(id));
-        if (toDeleteIds.length > 0) {
-          const deleteSql = `DELETE FROM content_links WHERE id IN (${toDeleteIds.map(() => "?").join(",")})`;
-          await pool.query(deleteSql, toDeleteIds);
-        }
-
-        for (const link of links) {
-          if (link.id) {
-            await pool.query(
-              "UPDATE content_links SET link_text = ?, link_url = ? WHERE id = ?",
-              [link.text, link.url, link.id]
-            );
-          } else {
-            await pool.query("INSERT INTO content_links (section_id, link_text, link_url) VALUES (?, ?, ?)", [
-              sectionId,
-              link.text,
-              link.url,
-            ]);
-          }
-        }
-      }
-
-      res.json({ message: "Inhalt erfolgreich aktualisiert." });
+      res.json({ message: "Untertitel erfolgreich aktualisiert." });
     } catch (error) {
-      console.error("Fehler beim Aktualisieren der Inhalte:", error);
-      res.status(500).json({ error: "Fehler beim Aktualisieren der Inhalte." });
+      console.error("Fehler beim Aktualisieren des Untertitels:", error);
+      res.status(500).json({ error: "Fehler beim Aktualisieren des Untertitels." });
     }
   },
 
+  // ➕ Link zu bestehender Section hinzufügen
+  addLinkToSection: async (req, res) => {
+    try {
+      if (!["vorstand", "admin"].includes(req.user.userType)) {
+        return res.status(403).json({ error: "Nur Admins oder Vorstände dürfen Links hinzufügen." });
+      }
+
+      const { sectionId } = req.params;
+      const { text, url } = req.body;
+
+      if (!text || !url) {
+        return res.status(400).json({ error: "Text und URL müssen angegeben werden." });
+      }
+
+      // Check, ob Section existiert
+      const [sectionExists] = await pool.query("SELECT id FROM content_sections WHERE id = ?", [sectionId]);
+      if (sectionExists.length === 0) {
+        return res.status(404).json({ error: "Section nicht gefunden." });
+      }
+
+      await pool.query("INSERT INTO content_links (section_id, link_text, link_url) VALUES (?, ?, ?)", [
+        sectionId,
+        text,
+        url,
+      ]);
+
+      res.status(201).json({ message: "Link erfolgreich hinzugefügt." });
+    } catch (error) {
+      console.error("Fehler beim Hinzufügen des Links:", error);
+      res.status(500).json({ error: "Fehler beim Hinzufügen des Links." });
+    }
+  },
+
+  // ✏️ Einzelnen Link bearbeiten
+  updateSingleLink: async (req, res) => {
+    try {
+      if (!["vorstand", "admin"].includes(req.user.userType)) {
+        return res.status(403).json({ error: "Nur Admins oder Vorstände dürfen Links bearbeiten." });
+      }
+
+      const { id } = req.params;
+      const { text, url } = req.body;
+
+      if (!text || !url) {
+        return res.status(400).json({ error: "Text und URL müssen angegeben werden." });
+      }
+
+      const [result] = await pool.query(
+        "UPDATE content_links SET link_text = ?, link_url = ? WHERE id = ?",
+        [text, url, id]
+      );
+
+      if (result.affectedRows === 0) return res.status(404).json({ error: "Link nicht gefunden." });
+
+      res.json({ message: "Link erfolgreich aktualisiert." });
+    } catch (error) {
+      console.error("Fehler beim Aktualisieren des Links:", error);
+      res.status(500).json({ error: "Fehler beim Aktualisieren des Links." });
+    }
+  },
+ // 🧩 Section bearbeiten (Titel + Links hinzufügen/ändern/löschen)
+ editSectionWithLinks: async (req, res) => {
+  try {
+    if (!["vorstand", "admin"].includes(req.user.userType)) {
+      return res.status(403).json({ error: "Nur Admins oder Vorstände dürfen Sections bearbeiten." });
+    }
+
+    const { id } = req.params;
+    const { subtitle, links } = req.body;
+
+    // Check Section existiert
+    const [sectionExists] = await pool.query("SELECT id FROM content_sections WHERE id = ?", [id]);
+    if (sectionExists.length === 0) {
+      return res.status(404).json({ error: "Section nicht gefunden." });
+    }
+
+    // 🔤 Titel aktualisieren
+    if (subtitle) {
+      await pool.query("UPDATE content_sections SET subtitle = ? WHERE id = ?", [subtitle, id]);
+    }
+
+    // 🔗 Links bearbeiten
+    if (Array.isArray(links)) {
+      const [existingLinks] = await pool.query("SELECT id FROM content_links WHERE section_id = ?", [id]);
+      const existingLinkIds = existingLinks.map((l) => l.id);
+      const sentLinkIds = links.filter((l) => l.id).map((l) => l.id);
+
+      // 🗑️ Links löschen, die nicht mehr gesendet wurden
+      const toDeleteIds = existingLinkIds.filter((id_) => !sentLinkIds.includes(id_));
+      if (toDeleteIds.length > 0) {
+        const deleteSql = `DELETE FROM content_links WHERE id IN (${toDeleteIds.map(() => "?").join(",")})`;
+        await pool.query(deleteSql, toDeleteIds);
+      }
+
+      // 🔁 Vorhandene Links aktualisieren oder neue einfügen
+      for (const link of links) {
+        if (link.id) {
+          await pool.query(
+            "UPDATE content_links SET link_text = ?, link_url = ? WHERE id = ?",
+            [link.text, link.url, link.id]
+          );
+        } else if (link.text && link.url) {
+          await pool.query(
+            "INSERT INTO content_links (section_id, link_text, link_url) VALUES (?, ?, ?)",
+            [id, link.text, link.url]
+          );
+        }
+      }
+    }
+
+    res.json({ message: "Section und Links erfolgreich aktualisiert." });
+  } catch (error) {
+    console.error("Fehler beim Bearbeiten der Section:", error);
+    res.status(500).json({ error: "Fehler beim Bearbeiten der Section." });
+  }
+},
+
+// 🧹 Einzelnen Link löschen
+deleteLink: async (req, res) => {
+  try {
+    if (req.user.userType !== "vorstand") {
+      return res.status(403).json({ error: "Nur Vorstände dürfen Links löschen." });
+    }
+
+    const { id } = req.params;
+    const [result] = await pool.query("DELETE FROM content_links WHERE id = ?", [id]);
+
+    if (result.affectedRows === 0) return res.status(404).json({ error: "Link nicht gefunden." });
+
+    res.json({ message: "Link erfolgreich gelöscht." });
+  } catch (error) {
+    console.error("Fehler beim Löschen des Links:", error);
+    res.status(500).json({ error: "Fehler beim Löschen des Links." });
+  }
+},
+  // 🔢 Reihenfolge aktualisieren
   reorderLinks: async (req, res) => {
     try {
       const { linkOrder } = req.body;
 
-      if (!Array.isArray(linkOrder)) {
+      if (!Array.isArray(linkOrder) || linkOrder.length === 0) {
         return res.status(400).json({ error: "linkOrder muss ein Array sein." });
       }
 
-      const updatePromises = linkOrder.map((linkId, index) =>
+      const updates = linkOrder.map((linkId, index) =>
         pool.query("UPDATE content_links SET position = ? WHERE id = ?", [index + 1, linkId])
       );
-
-      await Promise.all(updatePromises);
+      await Promise.all(updates);
 
       res.json({ message: "Reihenfolge erfolgreich aktualisiert." });
     } catch (error) {
       console.error("Fehler beim Aktualisieren der Reihenfolge:", error);
-      res.status(500).json({ error: "Interner Serverfehler beim Aktualisieren der Reihenfolge." });
+      res.status(500).json({ error: "Fehler beim Aktualisieren der Reihenfolge." });
     }
   },
 
+  // 🗑️ Section löschen (mit Links)
   deleteSection: async (req, res) => {
     try {
       if (req.user.userType !== "vorstand") {
-        return res.status(403).json({ error: "Nur Vorstände dürfen Inhalte löschen." });
+        return res.status(403).json({ error: "Nur Vorstände dürfen Sections löschen." });
       }
 
-      const sectionId = req.params.id;
-      const deleteSectionSql = "DELETE FROM content_sections WHERE id = ?";
-      const [result] = await pool.query(deleteSectionSql, [sectionId]);
+      const { id } = req.params;
+      await pool.query("DELETE FROM content_links WHERE section_id = ?", [id]);
+      const [result] = await pool.query("DELETE FROM content_sections WHERE id = ?", [id]);
 
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ error: "Untertitel nicht gefunden." });
-      }
+      if (result.affectedRows === 0) return res.status(404).json({ error: "Section nicht gefunden." });
 
-      res.json({ message: "Untertitel und alle zugehörigen Links gelöscht." });
+      res.json({ message: "Section und zugehörige Links gelöscht." });
     } catch (error) {
-      console.error("Fehler beim Löschen des Untertitels:", error);
-      res.status(500).json({ error: "Fehler beim Löschen des Untertitels." });
+      console.error("Fehler beim Löschen der Section:", error);
+      res.status(500).json({ error: "Fehler beim Löschen der Section." });
     }
   },
 
+  // 🧹 Einzelnen Link löschen
   deleteLink: async (req, res) => {
     try {
       if (req.user.userType !== "vorstand") {
         return res.status(403).json({ error: "Nur Vorstände dürfen Links löschen." });
       }
 
-      const linkId = req.params.id;
-      const deleteLinkSql = "DELETE FROM content_links WHERE id = ?";
-      const [result] = await pool.query(deleteLinkSql, [linkId]);
+      const { id } = req.params;
+      const [result] = await pool.query("DELETE FROM content_links WHERE id = ?", [id]);
 
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ error: "Link nicht gefunden." });
-      }
+      if (result.affectedRows === 0) return res.status(404).json({ error: "Link nicht gefunden." });
 
-      res.json({ message: "Link erfolgreich gelöscht." });
+      res.json({ message: "Link gelöscht." });
     } catch (error) {
       console.error("Fehler beim Löschen des Links:", error);
       res.status(500).json({ error: "Fehler beim Löschen des Links." });
