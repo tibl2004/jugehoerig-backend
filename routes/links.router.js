@@ -2,35 +2,36 @@ const express = require("express");
 const router = express.Router();
 const linksController = require("../controller/links.controller");
 
-// 📋 Alle Sections + Links abrufen
+
+// 🔹 Alle Sections + Links abrufen (öffentlich erlaubt)
 router.get("/", linksController.getAllSectionsWithLinks);
-// 🔐 Middleware für Token-Authentifizierung
+
+// 🔐 Auth prüfen für alle geschützten Routen
 router.use(linksController.authenticateToken);
 
-// 🆕 Neue Section mit Links erstellen
+// 🔹 Neue Section + Links erstellen
 router.post("/", linksController.createSectionWithLinks);
 
 
+// 🔹 Nur Section-Titel ändern
+router.put("/section/title/:id", linksController.updateSectionTitle);
 
-// ✏️ Nur Section-Titel ändern
-router.put("/title/:id", linksController.updateSectionTitle);
+// 🔹 Link zu bestehender Section hinzufügen
+router.post("/section/:sectionId/link", linksController.addLinkToSection);
 
-// ➕ Link zu bestehender Section hinzufügen
-router.post("/:sectionId/link", linksController.addLinkToSection);
+// 🔹 Einzelnen Link bearbeiten
+router.put("/:id", linksController.updateSingleLink);
 
-// ✏️ Einzelnen Link bearbeiten
-router.put("/link/:id", linksController.updateSingleLink);
+// 🔹 Ganze Section (inkl. Links) bearbeiten
+router.put("/section/:id", linksController.editSectionWithLinks);
 
-// 🧩 Section bearbeiten (Titel + Links hinzufügen/ändern/löschen)
-router.put("/:id", linksController.editSectionWithLinks);
-
-// 🔢 Reihenfolge der Links aktualisieren
+// 🔹 Reihenfolge aktualisieren
 router.put("/reorder", linksController.reorderLinks);
 
-// 🧹 Einzelnen Link löschen
+// 🔹 Einzelnen Link löschen
 router.delete("/:id", linksController.deleteLink);
 
-// 🗑️ Ganze Section löschen (mit Links)
-router.delete("/:id", linksController.deleteSection);
+// 🔹 Ganze Section löschen (inkl. Links)
+router.delete("/section/:id", linksController.deleteSection);
 
 module.exports = router;
