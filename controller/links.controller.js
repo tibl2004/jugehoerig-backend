@@ -22,8 +22,8 @@ const linksController = {
   // 🆕 Neue Section + Links erstellen
   createSectionWithLinks: async (req, res) => {
     try {
-      if (req.user.userType !== "vorstand") {
-        return res.status(403).json({ error: "Nur Vorstände dürfen Inhalte erstellen." });
+      if (!["vorstand", "admin"].includes(req.user.userType)) {
+        return res.status(403).json({ error: "Nur Admins oder Vorstände dürfen Sections bearbeiten." });
       }
 
       const { subtitle, links } = req.body;
@@ -212,8 +212,8 @@ const linksController = {
 // 🧹 Einzelnen Link löschen
 deleteLink: async (req, res) => {
   try {
-    if (req.user.userType !== "vorstand") {
-      return res.status(403).json({ error: "Nur Vorstände dürfen Links löschen." });
+    if (!["vorstand", "admin"].includes(req.user.userType)) {
+      return res.status(403).json({ error: "Nur Admins oder Vorstände dürfen Sections bearbeiten." });
     }
 
     const { id } = req.params;
@@ -251,10 +251,9 @@ deleteLink: async (req, res) => {
   // 🗑️ Section löschen (mit Links)
   deleteSection: async (req, res) => {
     try {
-      if (req.user.userType !== "vorstand") {
-        return res.status(403).json({ error: "Nur Vorstände dürfen Sections löschen." });
+      if (!["vorstand", "admin"].includes(req.user.userType)) {
+        return res.status(403).json({ error: "Nur Admins oder Vorstände dürfen Sections bearbeiten." });
       }
-
       const { id } = req.params;
       await pool.query("DELETE FROM content_links WHERE section_id = ?", [id]);
       const [result] = await pool.query("DELETE FROM content_sections WHERE id = ?", [id]);
@@ -271,8 +270,8 @@ deleteLink: async (req, res) => {
   // 🧹 Einzelnen Link löschen
   deleteLink: async (req, res) => {
     try {
-      if (req.user.userType !== "vorstand") {
-        return res.status(403).json({ error: "Nur Vorstände dürfen Links löschen." });
+      if (!["vorstand", "admin"].includes(req.user.userType)) {
+        return res.status(403).json({ error: "Nur Admins oder Vorstände dürfen Sections bearbeiten." });
       }
 
       const { id } = req.params;
