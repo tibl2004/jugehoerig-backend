@@ -35,26 +35,24 @@ const eventController = {
     }
   },
 
-  // =================== Events ===================
   createEvent: async (req, res) => {
     let connection;
     try {
       if (!isVorstand(req)) {
         return res.status(403).json({ error: "Nur Vorstand darf ein Event erstellen." });
       }
-
-      const { titel, beschreibung, ort, von, bis, alle, supporter, bildtitel, preise, bild } = req.body;
-
+  
+      const { titel, beschreibung, ort, von, bis, alle, supporter, bildtitel, preise, bild, felder } = req.body;
+  
       if (!titel || !beschreibung || !ort || !von || !bis) {
         return res.status(400).json({ error: "Titel, Beschreibung, Ort, Von und Bis müssen angegeben werden." });
       }
-
+  
       let base64Bild = null;
       if (bild) {
-        // akzeptiere: data:image/png;base64,.... oder other image/* types
         const matches = String(bild).match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
         if (!matches || matches.length !== 3) {
-          return res.status(400).json({ error: "Ungültiges Bildformat. Erwartet Base64 mit Prefix (data:...). " });
+          return res.status(400).json({ error: "Ungültiges Bildformat. Erwartet Base64 mit Prefix." });
         }
         const mimeType = matches[1].toLowerCase();
         const allowed = ["image/png","image/jpeg","image/jpg","image/webp"];
@@ -62,33 +60,56 @@ const eventController = {
           return res.status(400).json({ error: "Nur PNG, JPEG, JPG oder WEBP erlaubt." });
         }
         const buffer = Buffer.from(matches[2], "base64");
-        // Konvertiere zu PNG, speichere als Base64 (ohne data: prefix)
         const pngBuffer = await sharp(buffer).png().toBuffer();
         base64Bild = pngBuffer.toString("base64");
       }
-
+  
       connection = await pool.getConnection();
       await connection.beginTransaction();
-
+  
+      // Event erstellen
       const [eventResult] = await connection.query(
         `INSERT INTO events (titel, beschreibung, ort, von, bis, bild, bildtitel, supporter, alle, status)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'aktiv')`,
         [titel, beschreibung, ort, von, bis, base64Bild, bildtitel || null, supporter ? 1 : 0, alle ? 1 : 0]
       );
-
+  
       const eventId = eventResult.insertId;
-
+  
+      // Preise speichern
       if (Array.isArray(preise) && preise.length > 0) {
         const preisWerte = preise
-          .filter(p => p && (p.preisbeschreibung || p.kosten !== undefined) )
+          .filter(p => p && (p.preisbeschreibung || p.kosten !== undefined))
           .map(p => [eventId, p.preisbeschreibung || null, p.kosten != null ? p.kosten : 0]);
         if (preisWerte.length > 0) {
-          await connection.query(`INSERT INTO event_preise (event_id, preisbeschreibung, kosten) VALUES ?`, [preisWerte]);
+          await connection.query(
+            `INSERT INTO event_preise (event_id, preisbeschreibung, kosten) VALUES ?`,
+            [preisWerte]
+          );
         }
       }
-
+  
+      // Formularfelder speichern
+      if (Array.isArray(felder) && felder.length > 0) {
+        await connection.query(`DELETE FROM event_formulare WHERE event_id = ?`, [eventId]);
+        const werte = felder.map(f => {
+          let optionen = null;
+          if (f.typ === "select" && Array.isArray(f.optionen)) {
+            optionen = JSON.stringify(f.optionen);
+          }
+          return [eventId, f.feldname, f.typ || "text", f.pflicht ? 1 : 0, optionen];
+        });
+        if (werte.length > 0) {
+          await connection.query(
+            `INSERT INTO event_formulare (event_id, feldname, typ, pflicht, optionen) VALUES ?`,
+            [werte]
+          );
+        }
+      }
+  
       await connection.commit();
-      res.status(201).json({ message: "Event erfolgreich erstellt.", eventId });
+      res.status(201).json({ message: "Event + Formular erfolgreich erstellt.", eventId });
+  
     } catch (error) {
       console.error("Fehler beim Erstellen des Events:", error);
       if (connection) {
@@ -101,6 +122,7 @@ const eventController = {
       }
     }
   },
+  
 
   getEvents: async (req, res) => {
     try {
@@ -151,19 +173,27 @@ const eventController = {
   getEventById: async (req, res) => {
     try {
       const eventId = req.params.id;
-      await pool.query(`UPDATE events SET status='beendet' WHERE bis < NOW() AND id = ? AND status = 'aktiv'`, [eventId]);
-
-      const [rows] = await pool.query(`
-        SELECT e.id, e.titel, e.beschreibung, e.ort, e.von, e.bis, e.status, e.bild, e.alle, e.supporter,
+  
+      // Automatisch beenden, wenn Event vorbei
+      await pool.query(
+        `UPDATE events SET status='beendet' WHERE bis < NOW() AND id = ? AND status = 'aktiv'`,
+        [eventId]
+      );
+  
+      // Event + Preise abrufen
+      const [eventRows] = await pool.query(`
+        SELECT e.id, e.titel, e.beschreibung, e.ort, e.von, e.bis, e.status,
+               e.bild, e.alle, e.supporter,
                p.id AS preis_id, p.preisbeschreibung, p.kosten
         FROM events e
         LEFT JOIN event_preise p ON e.id = p.event_id
         WHERE e.id = ?
       `, [eventId]);
-
-      if (!rows.length) return res.status(404).json({ error: "Event nicht gefunden." });
-
-      const first = rows[0];
+  
+      if (!eventRows.length)
+        return res.status(404).json({ error: "Event nicht gefunden." });
+  
+      const first = eventRows[0];
       const event = {
         id: first.id,
         titel: first.titel,
@@ -176,9 +206,11 @@ const eventController = {
         alle: !!first.alle,
         supporter: !!first.supporter,
         preise: [],
+        formular: [] // 👈 hier wird das Formular ergänzt
       };
-
-      rows.forEach(r => {
+  
+      // Preise sammeln
+      eventRows.forEach(r => {
         if (r.preis_id) {
           event.preise.push({
             id: r.preis_id,
@@ -187,13 +219,32 @@ const eventController = {
           });
         }
       });
-
+  
+      // Formularfelder abrufen
+      const [formRows] = await pool.query(
+        `SELECT id, feldname, typ, pflicht, optionen
+         FROM event_formulare
+         WHERE event_id = ?`,
+        [eventId]
+      );
+  
+      if (formRows.length > 0) {
+        event.formular = formRows.map(f => ({
+          id: f.id,
+          feldname: f.feldname,
+          typ: f.typ,
+          pflicht: !!f.pflicht,
+          optionen: f.optionen ? JSON.parse(f.optionen) : null
+        }));
+      }
+  
       res.status(200).json(event);
     } catch (error) {
       console.error("Fehler beim Abrufen des Events:", error);
       res.status(500).json({ error: "Fehler beim Abrufen des Events." });
     }
   },
+  
 
   updateEvent: async (req, res) => {
     let connection;
@@ -270,47 +321,7 @@ const eventController = {
     }
   },
 
-  createFormFields: async (req, res) => {
-    try {
-      if (!isVorstand(req)) {
-        return res.status(403).json({ error: "Nur Vorstand darf Formulare erstellen." });
-      }
 
-      const { eventId, felder } = req.body;
-      if (!eventId || !Array.isArray(felder)) {
-        return res.status(400).json({ error: "Event-ID und Felder müssen angegeben werden." });
-      }
-
-      // Lösche vorherige Felder (ein Formular pro Event)
-      await pool.query(`DELETE FROM event_formulare WHERE event_id = ?`, [eventId]);
-
-      if (felder.length > 0) {
-        const werte = felder.map(f => {
-          let optionen = null;
-          if (f.typ === "select" && Array.isArray(f.optionen)) {
-            optionen = JSON.stringify(f.optionen);
-          }
-          return [
-            eventId,
-            f.feldname,
-            f.typ || "text",
-            f.pflicht ? 1 : 0,
-            optionen
-          ];
-        });
-
-        await pool.query(
-          `INSERT INTO event_formulare (event_id, feldname, typ, pflicht, optionen) VALUES ?`,
-          [werte]
-        );
-      }
-
-      res.status(201).json({ message: "Formular erfolgreich erstellt. Nur ein Formular pro Event ist erlaubt." });
-    } catch (error) {
-      console.error("Fehler beim Erstellen des Formulars:", error);
-      res.status(500).json({ error: "Fehler beim Erstellen des Formulars." });
-    }
-  },
 
   getFormFields: async (req, res) => {
     try {

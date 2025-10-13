@@ -22,8 +22,6 @@ router.delete("/:id", eventController.authenticateToken, eventController.deleteE
 // Formularfelder für ein Event abrufen
 router.get("/:id/formular", eventController.getFormFields);
 
-// Formularfelder erstellen/aktualisieren (nur Vorstand)
-router.post("/:id/formular", eventController.authenticateToken, eventController.createFormFields);
 
 // =================== Anmeldungen ===================
 // Anmeldung für ein Event
