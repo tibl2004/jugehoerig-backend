@@ -254,14 +254,17 @@ const eventController = {
       if (!isVorstand(req)) {
         return res.status(403).json({ error: "Nur Vorstand darf Events bearbeiten." });
       }
-
+  
       const eventId = req.params.id;
-      const { titel, beschreibung, ort, von, bis, alle, supporter, status, bild, bildtitel } = req.body;
-
-      // Baue dynamisches Update
+      const { titel, beschreibung, ort, von, bis, alle, supporter, status, bild, bildtitel, preise, felder } = req.body;
+  
+      connection = await pool.getConnection();
+      await connection.beginTransaction();
+  
+      // --- Dynamisches Event-Update ---
       const fields = [];
       const params = [];
-
+  
       if (titel !== undefined) { fields.push("titel = ?"); params.push(titel); }
       if (beschreibung !== undefined) { fields.push("beschreibung = ?"); params.push(beschreibung); }
       if (ort !== undefined) { fields.push("ort = ?"); params.push(ort); }
@@ -271,7 +274,7 @@ const eventController = {
       if (supporter !== undefined) { fields.push("supporter = ?"); params.push(supporter ? 1 : 0); }
       if (status !== undefined) { fields.push("status = ?"); params.push(status); }
       if (bildtitel !== undefined) { fields.push("bildtitel = ?"); params.push(bildtitel); }
-
+  
       if (bild) {
         const matches = String(bild).match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
         if (!matches || matches.length !== 3) {
@@ -288,18 +291,48 @@ const eventController = {
         fields.push("bild = ?");
         params.push(base64Img);
       }
-
-      if (fields.length === 0) {
-        return res.status(400).json({ error: "Keine zu aktualisierenden Felder gesendet." });
+  
+      if (fields.length > 0) {
+        params.push(eventId);
+        const sql = `UPDATE events SET ${fields.join(", ")} WHERE id = ?`;
+        await connection.query(sql, params);
       }
-
-      params.push(eventId);
-      const sql = `UPDATE events SET ${fields.join(", ")} WHERE id = ?`;
-      await pool.query(sql, params);
-
+  
+      // --- Preise aktualisieren (optional) ---
+      if (Array.isArray(preise)) {
+        await connection.query(`DELETE FROM event_preise WHERE event_id = ?`, [eventId]);
+        const validPreise = preise.filter(p => p && (p.preisbeschreibung || p.kosten != null));
+        if (validPreise.length > 0) {
+          const preisWerte = validPreise.map(p => [eventId, p.preisbeschreibung || null, p.kosten != null ? p.kosten : 0]);
+          await connection.query(`INSERT INTO event_preise (event_id, preisbeschreibung, kosten) VALUES ?`, [preisWerte]);
+        }
+      }
+  
+      // --- Formularfelder aktualisieren (optional) ---
+      if (Array.isArray(felder)) {
+        await connection.query(`DELETE FROM event_formulare WHERE event_id = ?`, [eventId]);
+        const validFelder = felder.filter(f => f && f.feldname);
+        const werte = validFelder.map(f => {
+          let optionen = null;
+          if (f.typ === "select" && Array.isArray(f.optionen)) optionen = JSON.stringify(f.optionen);
+          return [eventId, f.feldname, f.typ || "text", f.pflicht ? 1 : 0, optionen];
+        });
+        if (werte.length > 0) {
+          await connection.query(
+            `INSERT INTO event_formulare (event_id, feldname, typ, pflicht, optionen) VALUES ?`,
+            [werte]
+          );
+        }
+      }
+  
+      await connection.commit();
       res.status(200).json({ message: "Event erfolgreich aktualisiert." });
+  
     } catch (error) {
       console.error("Fehler beim Aktualisieren des Events:", error);
+      if (connection) {
+        try { await connection.rollback(); } catch(e) { console.error("Rollback error:", e); }
+      }
       res.status(500).json({ error: "Fehler beim Aktualisieren des Events." });
     } finally {
       if (connection) {
@@ -307,6 +340,7 @@ const eventController = {
       }
     }
   },
+  
 
   deleteEvent: async (req, res) => {
     try {
