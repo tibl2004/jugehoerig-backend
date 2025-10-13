@@ -34,7 +34,6 @@ const eventController = {
       res.status(500).json({ error: "Fehler bei der Token-Überprüfung." });
     }
   },
-
   createEvent: async (req, res) => {
     let connection;
     try {
@@ -48,6 +47,7 @@ const eventController = {
         return res.status(400).json({ error: "Titel, Beschreibung, Ort, Von und Bis müssen angegeben werden." });
       }
   
+      // Bild verarbeiten
       let base64Bild = null;
       if (bild) {
         const matches = String(bild).match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
@@ -73,7 +73,6 @@ const eventController = {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'aktiv')`,
         [titel, beschreibung, ort, von, bis, base64Bild, bildtitel || null, supporter ? 1 : 0, alle ? 1 : 0]
       );
-  
       const eventId = eventResult.insertId;
   
       // Preise speichern
@@ -92,13 +91,16 @@ const eventController = {
       // Formularfelder speichern
       if (Array.isArray(felder) && felder.length > 0) {
         await connection.query(`DELETE FROM event_formulare WHERE event_id = ?`, [eventId]);
-        const werte = felder.map(f => {
+  
+        const validFelder = felder.filter(f => f && f.feldname);
+        const werte = validFelder.map(f => {
           let optionen = null;
           if (f.typ === "select" && Array.isArray(f.optionen)) {
             optionen = JSON.stringify(f.optionen);
           }
           return [eventId, f.feldname, f.typ || "text", f.pflicht ? 1 : 0, optionen];
         });
+  
         if (werte.length > 0) {
           await connection.query(
             `INSERT INTO event_formulare (event_id, feldname, typ, pflicht, optionen) VALUES ?`,
