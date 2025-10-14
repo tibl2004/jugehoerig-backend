@@ -419,14 +419,16 @@ const eventController = {
 
   getRegistrations: async (req, res) => {
     try {
+      // Nur Admin oder Vorstand dürfen Zugriff
       if (!["vorstand", "admin"].includes(req.user.userType)) {
-        return res.status(403).json({ error: "Nur Admins oder Vorstände dürfen Links hinzufügen." });
+        return res.status(403).json({ error: "Nur Admins oder Vorstände dürfen Anmeldungen sehen." });
       }
+  
       const eventId = req.params.id;
   
       // Alle Event-Felder laden
       const [felder] = await pool.query(
-        `SELECT feldname, pflicht FROM event_formulare WHERE event_id = ?`,
+        `SELECT feldname, pflicht FROM event_formulare WHERE event_id = ? ORDER BY id ASC`,
         [eventId]
       );
   
@@ -436,11 +438,16 @@ const eventController = {
         [eventId]
       );
   
-      const result = rows.map(r => {
+      // Ergebnis formatieren
+      const registrations = rows.map(r => {
         let datenObj = {};
-        try { datenObj = r.daten ? JSON.parse(r.daten) : {}; } catch (e) { datenObj = {}; }
+        try {
+          datenObj = r.daten ? JSON.parse(r.daten) : {};
+        } catch (e) {
+          datenObj = {};
+        }
   
-        // Alle Felder dynamisch zusammenstellen
+        // Dynamisch alle Felder zusammenstellen
         const feldDaten = {};
         felder.forEach(feld => {
           feldDaten[feld.feldname] = datenObj[feld.feldname] || null;
@@ -453,12 +460,14 @@ const eventController = {
         };
       });
   
-      res.status(200).json({ felder, registrations: result });
+      // Antwort: Felder + Registrierungen
+      res.status(200).json({ felder, registrations });
     } catch (error) {
       console.error("Fehler beim Abrufen der Anmeldungen:", error);
       res.status(500).json({ error: "Fehler beim Abrufen der Anmeldungen." });
     }
   },
+  
   
 
   // =================== Nächste Event-ID ===================
