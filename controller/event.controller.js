@@ -2,38 +2,35 @@ const pool = require("../database/index");
 const jwt = require("jsonwebtoken");
 const sharp = require("sharp");
 
-const SECRET = process.env.JWT_SECRET || "secretKey";
 
-function isVorstand(req) {
-  // Unterstütze sowohl single userType als auch Array userTypes
-  const u = req.user || {};
-  if (!u) return false;
-  if (typeof u.userType === "string") return u.userType === "vorstand" || u.userType === "admin";
-  if (Array.isArray(u.userTypes)) return u.userTypes.includes("vorstand") || u.userTypes.includes("admin");
-  if (u.role) return u.role === "vorstand" || u.role === "admin";
-  return false;
-}
 
 const eventController = {
   
-     // Token-Check Middleware
-     authenticateToken: (req, res, next) => {
-      const authHeader = req.headers["authorization"];
-      const token = authHeader && authHeader.split(" ")[1];
-      if (!token) return res.status(401).json({ error: "Kein Token bereitgestellt." });
-  
-      jwt.verify(token, "secretKey", (err, user) => {
-        if (err) return res.status(403).json({ error: "Ungültiger Token." });
-        req.user = user;
-        next();
-      });
-    },
+       // 🔹 Authentifizierung (identisch zum Blog-Controller)
+  authenticateToken: (req, res, next) => {
+    const authHeader = req.headers["authorization"];
+    const token = authHeader && authHeader.split(" ")[1];
+    if (!token) return res.status(401).json({ error: "Kein Token bereitgestellt." });
+
+    jwt.verify(token, "secretKey", (err, user) => {
+      if (err) return res.status(403).json({ error: "Ungültiger Token." });
+      req.user = user;
+      next();
+    });
+  },
+
   createEvent: async (req, res) => {
     let connection;
     try {
-      if (!isVorstand(req)) {
-        return res.status(403).json({ error: "Nur Vorstand darf ein Event erstellen." });
-      }
+           // 🔒 Nur Vorstand/Admin darf Anmeldungen sehen
+           if (
+            !req.user.userTypes ||
+            !Array.isArray(req.user.userTypes) ||
+            !req.user.userTypes.some(role => ["vorstand", "admin"].includes(role))
+          ) {
+            return res.status(403).json({ error: "Nur Vorstände oder Admins dürfen Anmeldungen sehen." });
+          }
+    
   
       const { titel, beschreibung, ort, von, bis, alle, supporter, bildtitel, preise, bild, felder } = req.body;
   
@@ -245,10 +242,15 @@ const eventController = {
   updateEvent: async (req, res) => {
     let connection;
     try {
-      if (!isVorstand(req)) {
-        return res.status(403).json({ error: "Nur Vorstand darf Events bearbeiten." });
-      }
-  
+           // 🔒 Nur Vorstand/Admin darf Anmeldungen sehen
+           if (
+            !req.user.userTypes ||
+            !Array.isArray(req.user.userTypes) ||
+            !req.user.userTypes.some(role => ["vorstand", "admin"].includes(role))
+          ) {
+            return res.status(403).json({ error: "Nur Vorstände oder Admins dürfen Anmeldungen sehen." });
+          }
+    
       const eventId = req.params.id;
       const { titel, beschreibung, ort, von, bis, alle, supporter, status, bild, bildtitel, preise, felder } = req.body;
   
@@ -336,22 +338,28 @@ const eventController = {
   },
   
 
+  // 🔹 Event löschen (nur Vorstand/Admin)
   deleteEvent: async (req, res) => {
     try {
-      if (!isVorstand(req)) {
-        return res.status(403).json({ error: "Nur Vorstand darf Events löschen." });
+      if (
+        !req.user.userTypes ||
+        !Array.isArray(req.user.userTypes) ||
+        !req.user.userTypes.includes("vorstand")
+      ) {
+        return res.status(403).json({ error: "Nur Vorstände dürfen Events löschen." });
       }
+
       const eventId = req.params.id;
-      const [result] = await pool.query(`DELETE FROM events WHERE id = ?`, [eventId]);
-      if (result.affectedRows === 0) return res.status(404).json({ error: "Event nicht gefunden." });
+      await pool.query(`DELETE FROM event_anmeldungen WHERE event_id = ?`, [eventId]);
+      await pool.query(`DELETE FROM event_formulare WHERE event_id = ?`, [eventId]);
+      await pool.query(`DELETE FROM events WHERE id = ?`, [eventId]);
+
       res.status(200).json({ message: "Event erfolgreich gelöscht." });
     } catch (error) {
       console.error("Fehler beim Löschen des Events:", error);
       res.status(500).json({ error: "Fehler beim Löschen des Events." });
     }
   },
-
-
 
   getFormFields: async (req, res) => {
     try {
@@ -411,61 +419,76 @@ const eventController = {
     }
   },
 
+
   getRegistrations: async (req, res) => {
+    let connection;
     try {
-      // Nur Admin oder Vorstand dürfen Zugriff
-      if (!["vorstand", "admin"].includes(req.user.userType)) {
-        return res.status(403).json({ error: "Nur Admins oder Vorstände dürfen Anmeldungen sehen." });
+      // 🔒 Nur Vorstand/Admin darf Anmeldungen sehen
+      if (
+        !req.user.userTypes ||
+        !Array.isArray(req.user.userTypes) ||
+        !req.user.userTypes.some(role => ["vorstand", "admin"].includes(role))
+      ) {
+        return res.status(403).json({ error: "Nur Vorstände oder Admins dürfen Anmeldungen sehen." });
       }
-  
+
       const eventId = req.params.id;
-  
-      // Alle Event-Felder laden
-      const [felder] = await pool.query(
+      if (!eventId) {
+        return res.status(400).json({ error: "Event-ID fehlt." });
+      }
+
+      connection = await pool.getConnection();
+
+      // Formularfelder abrufen
+      const [felder] = await connection.query(
         `SELECT feldname, pflicht FROM event_formulare WHERE event_id = ? ORDER BY id ASC`,
         [eventId]
       );
-  
-      // Alle Anmeldungen laden
-      const [rows] = await pool.query(
+
+      // Anmeldungen abrufen
+      const [rows] = await connection.query(
         `SELECT id, daten, created_at FROM event_anmeldungen WHERE event_id = ? ORDER BY created_at DESC`,
         [eventId]
       );
-  
-      // Wenn keine Anmeldungen vorhanden sind
+
       if (rows.length === 0) {
-        return res.status(200).json({ felder, registrations: [], message: "Bis jetzt gibt es noch keine Anmeldungen." });
+        return res.status(200).json({
+          felder,
+          registrations: [],
+          message: "Bis jetzt gibt es noch keine Anmeldungen."
+        });
       }
-  
-      // Ergebnis formatieren
+
+      // Daten formatieren
       const registrations = rows.map(r => {
         let datenObj = {};
         try {
           datenObj = r.daten ? JSON.parse(r.daten) : {};
-        } catch (e) {
+        } catch {
           datenObj = {};
         }
-  
-        // Dynamisch alle Felder zusammenstellen
+
         const feldDaten = {};
         felder.forEach(feld => {
           feldDaten[feld.feldname] = datenObj[feld.feldname] || null;
         });
-  
+
         return {
           id: r.id,
           daten: feldDaten,
           created_at: r.created_at
         };
       });
-  
-      // Antwort: Felder + Registrierungen
+
       res.status(200).json({ felder, registrations });
     } catch (error) {
-      console.error("Fehler beim Abrufen der Anmeldungen:", error);
-      res.status(500).json({ error: "Fehler beim Abrufen der Anmeldungen." });
+      console.error("Fehler beim Abrufen der Event-Anmeldungen:", error);
+      res.status(500).json({ error: "Fehler beim Abrufen der Event-Anmeldungen." });
+    } finally {
+      if (connection) connection.release();
     }
-  },  
+  },
+
   
 
   // =================== Nächste Event-ID ===================
@@ -486,3 +509,4 @@ const eventController = {
 };
 
 module.exports = eventController;
+
