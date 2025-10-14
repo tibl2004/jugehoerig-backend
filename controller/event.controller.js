@@ -422,31 +422,45 @@ const eventController = {
       if (!isVorstand(req)) {
         return res.status(403).json({ error: "Nur Vorstand darf Anmeldungen sehen." });
       }
-
+  
       const eventId = req.params.id;
+  
+      // Alle Event-Felder laden
+      const [felder] = await pool.query(
+        `SELECT feldname, pflicht FROM event_formulare WHERE event_id = ?`,
+        [eventId]
+      );
+  
+      // Alle Anmeldungen laden
       const [rows] = await pool.query(
         `SELECT id, daten, created_at FROM event_anmeldungen WHERE event_id = ? ORDER BY created_at DESC`,
         [eventId]
       );
-
+  
       const result = rows.map(r => {
         let datenObj = {};
         try { datenObj = r.daten ? JSON.parse(r.daten) : {}; } catch (e) { datenObj = {}; }
+  
+        // Alle Felder dynamisch zusammenstellen
+        const feldDaten = {};
+        felder.forEach(feld => {
+          feldDaten[feld.feldname] = datenObj[feld.feldname] || null;
+        });
+  
         return {
           id: r.id,
-          vorname: datenObj.vorname || null,
-          nachname: datenObj.nachname || null,
-          daten: datenObj,
+          daten: feldDaten,
           created_at: r.created_at
         };
       });
-
-      res.status(200).json(result);
+  
+      res.status(200).json({ felder, registrations: result });
     } catch (error) {
       console.error("Fehler beim Abrufen der Anmeldungen:", error);
       res.status(500).json({ error: "Fehler beim Abrufen der Anmeldungen." });
     }
   },
+  
 
   // =================== Nächste Event-ID ===================
   getNextEventId: async (req, res) => {
