@@ -438,6 +438,11 @@ const eventController = {
         [eventId]
       );
   
+      // Wenn keine Anmeldungen vorhanden sind
+      if (rows.length === 0) {
+        return res.status(200).json({ felder, registrations: [], message: "Bis jetzt gibt es noch keine Anmeldungen." });
+      }
+  
       // Ergebnis formatieren
       const registrations = rows.map(r => {
         let datenObj = {};
@@ -466,8 +471,7 @@ const eventController = {
       console.error("Fehler beim Abrufen der Anmeldungen:", error);
       res.status(500).json({ error: "Fehler beim Abrufen der Anmeldungen." });
     }
-  },
-  
+  },  
   
 
   // =================== Nächste Event-ID ===================
