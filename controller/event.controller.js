@@ -419,10 +419,9 @@ const eventController = {
 
   getRegistrations: async (req, res) => {
     try {
-      if (!isVorstand(req)) {
-        return res.status(403).json({ error: "Nur Vorstand darf Anmeldungen sehen." });
+      if (!["vorstand", "admin"].includes(req.user.userType)) {
+        return res.status(403).json({ error: "Nur Admins oder Vorstände dürfen Links hinzufügen." });
       }
-  
       const eventId = req.params.id;
   
       // Alle Event-Felder laden
