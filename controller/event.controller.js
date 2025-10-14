@@ -15,25 +15,19 @@ function isVorstand(req) {
 }
 
 const eventController = {
-  authenticateToken: (req, res, next) => {
-    try {
+  
+     // Token-Check Middleware
+     authenticateToken: (req, res, next) => {
       const authHeader = req.headers["authorization"];
       const token = authHeader && authHeader.split(" ")[1];
       if (!token) return res.status(401).json({ error: "Kein Token bereitgestellt." });
-
-      jwt.verify(token, SECRET, (err, user) => {
-        if (err) {
-          console.error("JWT Verify Error:", err);
-          return res.status(403).json({ error: "Ungültiger Token." });
-        }
+  
+      jwt.verify(token, "secretKey", (err, user) => {
+        if (err) return res.status(403).json({ error: "Ungültiger Token." });
         req.user = user;
         next();
       });
-    } catch (err) {
-      console.error("authenticateToken Fehler:", err);
-      res.status(500).json({ error: "Fehler bei der Token-Überprüfung." });
-    }
-  },
+    },
   createEvent: async (req, res) => {
     let connection;
     try {
