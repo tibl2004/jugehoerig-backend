@@ -505,7 +505,61 @@ const eventController = {
       console.error("Fehler beim Holen der nächsten Event-ID:", error);
       res.status(500).json({ error: "Fehler beim Holen der nächsten Event-ID." });
     }
+  },
+
+  // 🔹 Manuelle Anmeldung hinzufügen (nur Vorstand/Admin)
+addManualRegistration: async (req, res) => {
+  try {
+    // 🔒 Berechtigungsprüfung
+    if (
+      !req.user.userTypes ||
+      !Array.isArray(req.user.userTypes) ||
+      !req.user.userTypes.some(role => ["vorstand", "admin"].includes(role))
+    ) {
+      return res.status(403).json({ error: "Nur Vorstände oder Admins dürfen manuelle Anmeldungen erstellen." });
+    }
+
+    const eventId = req.params.id;
+    const { daten } = req.body;
+
+    if (!eventId) {
+      return res.status(400).json({ error: "Event-ID fehlt." });
+    }
+
+    if (!daten || typeof daten !== "object") {
+      return res.status(400).json({ error: "Formulardaten müssen gesendet werden." });
+    }
+
+    // Formularfelder des Events abrufen
+    const [felder] = await pool.query(
+      `SELECT feldname, pflicht FROM event_formulare WHERE event_id = ? ORDER BY id ASC`,
+      [eventId]
+    );
+
+    if (felder.length === 0) {
+      return res.status(400).json({ error: "Dieses Event hat keine definierten Formularfelder." });
+    }
+
+    // Pflichtfelder prüfen
+    for (const feld of felder) {
+      if (feld.pflicht && (!daten[feld.feldname] || daten[feld.feldname].toString().trim() === "")) {
+        return res.status(400).json({ error: `Pflichtfeld fehlt oder leer: ${feld.feldname}` });
+      }
+    }
+
+    // Daten als JSON speichern
+    await pool.query(
+      `INSERT INTO event_anmeldungen (event_id, daten) VALUES (?, ?)`,
+      [eventId, JSON.stringify(daten)]
+    );
+
+    res.status(201).json({ message: "Manuelle Anmeldung erfolgreich hinzugefügt." });
+  } catch (error) {
+    console.error("Fehler beim Hinzufügen einer manuellen Anmeldung:", error);
+    res.status(500).json({ error: "Fehler beim Hinzufügen einer manuellen Anmeldung." });
   }
+},
+
 };
 
 module.exports = eventController;

@@ -28,6 +28,6 @@ router.put("/me", authenticate, upload.single("foto"), vorstandController.update
 // Nur vorstand darf Passwort von einem Vorstand ändern
 router.put("/change-password", authenticate, vorstandController.changePasswordByvorstand);
 
-
+router.get('/logins', authenticate, vorstandController.getVorstandLogins);
 
 module.exports = router;

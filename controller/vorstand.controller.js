@@ -142,6 +142,34 @@ const vorstandController = {
     }
   },
 
+  getVorstandLogins: async (req, res) => {
+    try {
+      // Optional: Zugriff nur für bestimmte Benutzer prüfen
+      if (!req.user.userTypes?.includes("vorstand")) {
+        return res.status(403).json({ error: "Zugriff verweigert." });
+      }
+  
+      // Vorstands-Logins abrufen
+      const [rows] = await pool.query(
+        `SELECT benutzername, vorname, nachname FROM vorstand`
+      );
+  
+      const result = rows.map(v => ({
+        benutzername: v.benutzername,
+        vorname: v.vorname,
+        nachname: v.nachname
+      }));
+  
+      res.status(200).json(result);
+    } catch (error) {
+      console.error("Fehler beim Abrufen der Vorstands-Logins:", error);
+      res.status(500).json({ error: "Fehler beim Abrufen der Vorstands-Logins." });
+    }
+  },
+
+  
+  
+
   getVorstandFotos: async (req, res) => {
     try {
       const [rows] = await pool.query(
