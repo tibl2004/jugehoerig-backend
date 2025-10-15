@@ -19,6 +19,15 @@ const transporter = nodemailer.createTransport({
   }
 });
 
+// Prüfen, ob SMTP funktioniert
+transporter.verify((err, success) => {
+  if (err) {
+    console.error("SMTP Fehler beim GMX Login:", err);
+  } else {
+    console.log("GMX SMTP funktioniert, E-Mails können gesendet werden!");
+  }
+});
+
 // ---------------------------------------------------
 
 const newsletterController = {
