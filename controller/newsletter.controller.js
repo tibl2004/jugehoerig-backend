@@ -5,21 +5,20 @@ const sharp = require('sharp');
 
 // ------------------ Konfiguration ------------------
 const MAIL_USER = 'no-reply.jugehoerig@gmx.ch';
-const MAIL_PASS = 'jugehoerig!1234';
 
-// Nodemailer Transporter für GMX
 const transporter = nodemailer.createTransport({
   host: 'mail.gmx.net',
-  port: 465,
-  secure: true, // SSL
+  port: 587,          // STARTTLS
+  secure: false,      // false = STARTTLS, true = SSL/TLS (Port 465)
   auth: {
-    user: MAIL_USER,
-    pass: MAIL_PASS,
+    user: 'no-reply.jugehoerig@gmx.ch',   // dein GMX-Login
+    pass: 'jugehoerig!1234',        // normales Passwort
   },
-  pool: true,
-  maxConnections: 5,
-  maxMessages: 100,
+  tls: {
+    rejectUnauthorized: false
+  }
 });
+
 // ---------------------------------------------------
 
 const newsletterController = {
