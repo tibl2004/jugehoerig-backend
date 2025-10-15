@@ -8,14 +8,11 @@ const MAIL_USER = 'no-reply.jugehoerig@gmx.ch';
 
 const transporter = nodemailer.createTransport({
   host: 'mail.gmx.net',
-  port: 587,          // STARTTLS
-  secure: false,      // false = STARTTLS, true = SSL/TLS (Port 465)
+  port: 587,
+  secure: false,
   auth: {
-    user: 'no-reply.jugehoerig@gmx.ch',   // dein GMX-Login
-    pass: 'jugehoerig!1234',        // normales Passwort
-  },
-  tls: {
-    rejectUnauthorized: false
+    user: 'no-reply.jugehoerig@gmx.ch',
+    pass: 'jugehoerig!1234', // Muss ein GMX-App-Passwort sein
   }
 });
 
