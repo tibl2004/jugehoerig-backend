@@ -115,54 +115,108 @@ const newsletterController = {
   },
 
   // --- Subscriber anmelden ---
-  subscribe: async (req, res) => {
-    try {
-      const { vorname, nachname, email, newsletter_optin } = req.body;
-      if (!vorname || !nachname || !email) return res.status(400).json({ error: 'Vorname, Nachname und E-Mail sind erforderlich' });
-      if (newsletter_optin !== true) return res.status(400).json({ error: 'Newsletter-Opt-in muss bestätigt sein' });
+// --- Subscriber anmelden mit Bestätigungs-E-Mail ---
+subscribe: async (req, res) => {
+  try {
+    const { vorname, nachname, email, newsletter_optin } = req.body;
+    if (!vorname || !nachname || !email) return res.status(400).json({ error: 'Vorname, Nachname und E-Mail sind erforderlich' });
+    if (newsletter_optin !== true) return res.status(400).json({ error: 'Newsletter-Opt-in muss bestätigt sein' });
 
-      const [[existing]] = await pool.query('SELECT * FROM newsletter_subscribers WHERE email = ?', [email]);
+    const [[existing]] = await pool.query('SELECT * FROM newsletter_subscribers WHERE email = ?', [email]);
+    const unsubscribeToken = crypto.randomBytes(20).toString('hex');
 
-      const unsubscribeToken = crypto.randomBytes(20).toString('hex');
-
-      if (existing) {
-        // Reaktivierung
-        await pool.query(
-          'UPDATE newsletter_subscribers SET unsubscribed_at = NULL, subscribed_at = NOW(), unsubscribe_token = ?, vorname = ?, nachname = ?, newsletter_optin = 1 WHERE email = ?',
-          [unsubscribeToken, vorname, nachname, email]
-        );
-      } else {
-        await pool.query(
-          'INSERT INTO newsletter_subscribers (vorname, nachname, email, unsubscribe_token, newsletter_optin, subscribed_at) VALUES (?, ?, ?, ?, 1, NOW())',
-          [vorname, nachname, email, unsubscribeToken]
-        );
-      }
-
-      res.json({ message: 'Newsletter-Anmeldung erfolgreich' });
-    } catch (error) {
-      console.error('Fehler beim Newsletter-Anmelden:', error);
-      res.status(500).json({ error: 'Serverfehler bei der Anmeldung' });
+    if (existing) {
+      // Reaktivierung
+      await pool.query(
+        'UPDATE newsletter_subscribers SET unsubscribed_at = NULL, subscribed_at = NOW(), unsubscribe_token = ?, vorname = ?, nachname = ?, newsletter_optin = 1 WHERE email = ?',
+        [unsubscribeToken, vorname, nachname, email]
+      );
+    } else {
+      // Neue Anmeldung
+      await pool.query(
+        'INSERT INTO newsletter_subscribers (vorname, nachname, email, unsubscribe_token, newsletter_optin, subscribed_at) VALUES (?, ?, ?, ?, 1, NOW())',
+        [vorname, nachname, email, unsubscribeToken]
+      );
     }
-  },
+
+    // --- HTML Bestätigungs-Mail ---
+    const html = `
+      <div style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+        <table align="center" width="600" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+          <tr>
+            <td align="center" style="background-color: #F59422; padding: 20px;">
+              <h1 style="color: #fff; margin: 0;">Jugendverein e.V.</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 20px;">
+              <h2 style="color:#F59422;">Willkommen im Newsletter!</h2>
+              <p>Hallo ${vorname} ${nachname},</p>
+              <p>vielen Dank für deine Anmeldung zu unserem Newsletter. Wir freuen uns, dich an Bord zu haben!</p>
+              <p>Falls du den Newsletter irgendwann nicht mehr erhalten möchtest, kannst du dich jederzeit abmelden:</p>
+              <div style="text-align: center; margin: 20px 0;">
+                <a href="https://meinverein.de/api/newsletter/unsubscribe?token=${unsubscribeToken}" 
+                   style="background: #F59422; color: #fff; text-decoration: none; padding: 12px 18px; border-radius: 5px; display: inline-block;">Jetzt abmelden</a>
+              </div>
+              <p style="font-size: 12px; color: #999; text-align: center;">© ${new Date().getFullYear()} Jugendverein e.V.</p>
+            </td>
+          </tr>
+        </table>
+      </div>
+    `;
+
+    // Mail senden
+    await transporter.sendMail({
+      from: `"Jugendverein" <${MAIL_USER}>`,
+      to: email,
+      subject: 'Willkommen zu unserem Newsletter!',
+      html,
+    });
+
+    res.json({ message: 'Newsletter-Anmeldung erfolgreich. Eine Bestätigungs-Mail wurde gesendet.' });
+  } catch (error) {
+    console.error('Fehler beim Newsletter-Anmelden:', error);
+    res.status(500).json({ error: 'Serverfehler bei der Anmeldung' });
+  }
+},
+
 
   // --- Abmelden ---
   unsubscribe: async (req, res) => {
     try {
       const { token } = req.query;
-      if (!token) return res.status(400).json({ error: 'Token wird benötigt' });
-
-      const [[subscriber]] = await pool.query('SELECT * FROM newsletter_subscribers WHERE unsubscribe_token = ?', [token]);
-      if (!subscriber) return res.status(404).json({ error: 'Ungültiger Abmelde-Token' });
-
-      if (subscriber.unsubscribed_at !== null) return res.status(400).json({ error: 'Du bist bereits abgemeldet' });
-
-      await pool.query('UPDATE newsletter_subscribers SET unsubscribed_at = NOW() WHERE id = ?', [subscriber.id]);
-      res.json({ message: 'Du wurdest erfolgreich vom Newsletter abgemeldet' });
+  
+      if (!token || typeof token !== 'string') {
+        return res.status(400).send('<h3>Fehler: Kein gültiger Abmelde-Token übergeben.</h3>');
+      }
+  
+      const [subscribers] = await pool.query(
+        'SELECT * FROM newsletter_subscribers WHERE unsubscribe_token = ? AND unsubscribed_at IS NULL',
+        [token]
+      );
+  
+      if (!subscribers || subscribers.length === 0) {
+        return res.status(404).send('<h3>Dieser Abmelde-Link ist ungültig oder wurde bereits verwendet.</h3>');
+      }
+  
+      await pool.query(
+        'UPDATE newsletter_subscribers SET unsubscribed_at = NOW() WHERE unsubscribe_token = ?',
+        [token]
+      );
+  
+      return res.send(`
+        <div style="font-family: Arial, sans-serif; text-align: center; margin-top: 50px;">
+          <h2>Du wurdest erfolgreich vom Newsletter abgemeldet.</h2>
+          <p style="color: gray;">Es tut uns leid, dich gehen zu sehen. Du kannst dich jederzeit wieder anmelden.</p>
+          <a href="https://jugehoerig.ch" style="display:inline-block;margin-top:20px;padding:10px 20px;background:#0066cc;color:white;text-decoration:none;border-radius:4px;">Zurück zur Startseite</a>
+        </div>
+      `);
     } catch (error) {
-      console.error('Fehler beim Abmelden:', error);
-      res.status(500).json({ error: 'Serverfehler beim Abmelden' });
+      console.error('Fehler beim Abmelden vom Newsletter:', error);
+      return res.status(500).send('<h3>Serverfehler bei der Newsletter-Abmeldung.</h3>');
     }
   },
+  
 
   // --- Alle Abonnenten abrufen ---
 getAllSubscribers: async (req, res) => {
