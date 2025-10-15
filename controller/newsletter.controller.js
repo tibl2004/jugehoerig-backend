@@ -4,12 +4,14 @@ const crypto = require('crypto');
 const sharp = require('sharp');
 
 // ------------------ Konfiguration ------------------
-const MAIL_USER = 'info@jugehoerig.ch';
-const MAIL_PASS = 'juge!1234';
+const MAIL_USER = 'no-reply.jugehoerig@gmx.ch';
+const MAIL_PASS = 'jugehoerig!1234';
 
-// Nodemailer Transporter (Gmail)
+// Nodemailer Transporter für GMX
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'mail.gmx.net',
+  port: 465,
+  secure: true, // SSL
   auth: {
     user: MAIL_USER,
     pass: MAIL_PASS,
