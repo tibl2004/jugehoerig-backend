@@ -332,7 +332,44 @@ const vorstandController = {
       console.error("Fehler beim Passwort-Ändern:", error);
       res.status(500).json({ error: "Fehler beim Passwort-Ändern." });
     }
-  }
+  },
+
+  changeMultiplePasswords: async (req, res) => {
+    try {
+      // Zugriff nur für Vorstände
+      const userType = req.user.userType;
+      if (userType !== 'vorstand') {
+        return res.status(403).json({ error: "Nur Vorstände dürfen Passwörter ändern." });
+      }
+
+      const { updates } = req.body;
+
+      if (!Array.isArray(updates) || updates.length === 0) {
+        return res.status(400).json({ error: "Erwarte ein Array von Updates (id + neuesPasswort)." });
+      }
+
+      // Überprüfen, ob alle Felder korrekt sind
+      for (const update of updates) {
+        if (!update.id || !update.neuesPasswort) {
+          return res.status(400).json({ error: "Jeder Eintrag muss eine id und ein neuesPasswort enthalten." });
+        }
+      }
+
+      // Passwörter parallel verschlüsseln und speichern
+      const updatePromises = updates.map(async ({ id, neuesPasswort }) => {
+        const hashed = await bcrypt.hash(neuesPasswort, 10);
+        await pool.query(`UPDATE vorstand SET passwort = ? WHERE id = ?`, [hashed, id]);
+      });
+
+      await Promise.all(updatePromises);
+
+      res.status(200).json({ message: "Alle Passwörter wurden erfolgreich geändert." });
+    } catch (error) {
+      console.error("Fehler beim gleichzeitigen Passwort-Ändern:", error);
+      res.status(500).json({ error: "Fehler beim gleichzeitigen Passwort-Ändern." });
+    }
+  },
+
 };
 
 module.exports = vorstandController;

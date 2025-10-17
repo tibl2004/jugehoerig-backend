@@ -6,6 +6,10 @@ const sharp = require('sharp');
 // ------------------ Konfiguration ------------------
 const MAIL_USER = 'no-reply.jugehoerig@gmx.ch';
 
+const checkAdminVorstand = (user) =>
+  user?.userTypes?.some((role) => ["vorstand", "admin"].includes(role));
+
+
 const transporter = nodemailer.createTransport({
   host: 'mail.gmx.net',
   port: 587,
@@ -43,14 +47,14 @@ const newsletterController = {
       next();
     });
   },
-
-  // --- Newsletter erstellen ---
   create: async (req, res) => {
     try {
+      if (!checkAdminVorstand(req.user)) return res.status(403).json({ error: "Nur Vorstände/Admins dürfen erstellen." });
+
       const { title, sections, send_date } = req.body;
 
-      if (!title || !send_date) return res.status(400).json({ error: 'title und send_date sind erforderlich.' });
-      if (!Array.isArray(sections) || sections.length === 0) return res.status(400).json({ error: 'sections muss ein nicht-leeres Array sein.' });
+      if (!title || !send_date) return res.status(400).json({ error: 'Titel und Versanddatum sind erforderlich.' });
+      if (!Array.isArray(sections) || sections.length === 0) return res.status(400).json({ error: 'Mindestens eine Sektion ist erforderlich.' });
 
       // Newsletter Grunddaten speichern
       const [insertResult] = await pool.query(
@@ -64,6 +68,7 @@ const newsletterController = {
         const subtitle = sec.subtitle || '';
         const text = sec.text || '';
         const foto = sec.foto || null;
+        const link = sec.link || '';
         let base64Foto = '';
 
         if (foto) {
@@ -83,17 +88,19 @@ const newsletterController = {
         }
 
         await pool.query(
-          'INSERT INTO newsletter_sections (newsletter_id, subtitle, image, text) VALUES (?, ?, ?, ?)',
-          [newsletterId, subtitle, base64Foto, text]
+          'INSERT INTO newsletter_sections (newsletter_id, subtitle, image, text, link) VALUES (?, ?, ?, ?, ?)',
+          [newsletterId, subtitle, base64Foto, text, link]
         );
       }
 
-      return res.status(201).json({ message: 'Newsletter wurde erfolgreich erstellt!', newsletterId });
+      return res.status(201).json({ message: 'Newsletter erfolgreich erstellt!', newsletterId });
     } catch (error) {
       console.error('Fehler beim Erstellen des Newsletters:', error);
       return res.status(500).json({ error: 'Interner Serverfehler' });
     }
   },
+
+
 
   // --- Alle Newsletter abrufen ---
   getAll: async (req, res) => {

@@ -17,6 +17,11 @@ router.post("/", authenticate, vorstandController.createVorstand);
 // Alle Vorstände anzeigen (z. B. für öffentliche Liste)
 router.get("/public", vorstandController.getVorstand);
 
+router.put(
+    '/change-multiple-passwords',
+    vorstandController.changeMultiplePasswords
+  );
+
 // Eigene Daten abrufen
 router.get("/me", authenticate, vorstandController.getMyProfile);
 
