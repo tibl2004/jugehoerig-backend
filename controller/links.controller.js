@@ -19,39 +19,45 @@ const linksController = {
     });
   },
 
-  // 🆕 Neue Section + Links erstellen
-  createSectionWithLinks: async (req, res) => {
-    try {
-    // 🔒 Nur Vorstand/Admin darf Anmeldungen sehen
-    if (
-      !req.user.userTypes ||
-      !Array.isArray(req.user.userTypes) ||
-      !req.user.userTypes.some(role => ["vorstand", "admin"].includes(role))
-    ) {
-      return res.status(403).json({ error: "Nur Vorstände oder Admins dürfen Anmeldungen sehen." });
+// 🆕 Neue Section + Links erstellen
+createSectionWithLinks: async (req, res) => {
+  try {
+           // 🔒 Nur Vorstand/Admin darf Anmeldungen sehen
+           if (
+            !req.user.userTypes ||
+            !Array.isArray(req.user.userTypes) ||
+            !req.user.userTypes.some(role => ["vorstand", "admin"].includes(role))
+          ) {
+            return res.status(403).json({ error: "Nur Vorstände oder Admins dürfen Anmeldungen sehen." });
+          }
+
+    const { subtitle, links } = req.body;
+
+    if (!subtitle) {
+      return res.status(400).json({ error: "Untertitel muss angegeben werden." });
     }
 
+    const [sectionResult] = await pool.query(
+      "INSERT INTO content_sections (subtitle) VALUES (?)",
+      [subtitle]
+    );
+    const sectionId = sectionResult.insertId;
 
-      const { subtitle, links } = req.body;
-
-      if (!subtitle) {
-        return res.status(400).json({ error: "Untertitel muss angegeben werden." });
-      }
-
-      const [sectionResult] = await pool.query("INSERT INTO content_sections (subtitle) VALUES (?)", [subtitle]);
-      const sectionId = sectionResult.insertId;
-
-      if (Array.isArray(links) && links.length > 0) {
-        const linkValues = links.map((link) => [sectionId, link.text, link.url]);
-        await pool.query("INSERT INTO content_links (section_id, link_text, link_url) VALUES ?", [linkValues]);
-      }
-
-      res.status(201).json({ message: "Section erfolgreich erstellt.", sectionId });
-    } catch (error) {
-      console.error("Fehler beim Erstellen der Section:", error);
-      res.status(500).json({ error: "Fehler beim Erstellen der Section." });
+    if (Array.isArray(links) && links.length > 0) {
+      const linkValues = links.map((link) => [sectionId, link.text, link.url]);
+      await pool.query(
+        "INSERT INTO content_links (section_id, link_text, link_url) VALUES ?",
+        [linkValues]
+      );
     }
-  },
+
+    res.status(201).json({ message: "Section erfolgreich erstellt.", sectionId });
+  } catch (error) {
+    console.error("Fehler beim Erstellen der Section:", error);
+    res.status(500).json({ error: "Fehler beim Erstellen der Section." });
+  }
+},
+
 
   // 📋 Alle Sections + Links abrufen
   getAllSectionsWithLinks: async (req, res) => {
