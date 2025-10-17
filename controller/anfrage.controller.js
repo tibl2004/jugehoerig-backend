@@ -1,8 +1,30 @@
 const pool = require("../database/index");
 const jwt = require("jsonwebtoken");
+const nodemailer = require("nodemailer");
+const axios = require("axios");
 
+
+// ------------------ Mailer Setup ------------------
+const MAIL_USER = 'no-reply.jugehoerig@gmx.ch';
+const MAIL_PASS = 'jugehoerig!1234'; // GMX-App-Passwort
+
+const transporter = nodemailer.createTransport({
+  host: 'mail.gmx.net',
+  port: 587,
+  secure: false,
+  auth: {
+    user: MAIL_USER,
+    pass: MAIL_PASS,
+  }
+});
+
+transporter.verify((err, success) => {
+  if (err) console.error("SMTP Fehler beim GMX Login:", err);
+  else console.log("GMX SMTP funktioniert, E-Mails können gesendet werden!");
+});
+
+// ------------------ Controller ------------------
 const anfrageController = {
-  // Middleware zum Prüfen des Tokens und Setzen von req.user
   authenticateToken: (req, res, next) => {
     const authHeader = req.headers["authorization"];
     const token = authHeader && authHeader.split(" ")[1];
@@ -15,44 +37,103 @@ const anfrageController = {
     });
   },
 
-  // Anfrage erstellen – nur für Vorstände
+
   createAnfrage: async (req, res) => {
     if (req.user.userType !== "vorstand") {
       return res.status(403).json({ error: "Nur Vorstände dürfen Anfragen erstellen." });
     }
-
+  
     const { name, email, nachricht } = req.body;
     if (!name || !email || !nachricht) {
       return res.status(400).json({ error: "Name, Email und Nachricht sind Pflichtfelder." });
     }
-
+  
     try {
+      // Anfrage in DB speichern
       const [result] = await pool.query(
         "INSERT INTO anfragen (name, email, nachricht, erstellt_am) VALUES (?, ?, ?, NOW())",
         [name, email, nachricht]
       );
       const anfrageId = result.insertId;
-
+  
+      // Logo über API abrufen
+      let logoBase64 = null;
+      try {
+        const logoRes = await axios.get("https://jugehoerig-backend.onrender.com/api/logo");
+        logoBase64 = logoRes.data.logoUrl || null;
+      } catch (err) {
+        console.error("Logo konnte nicht geladen werden:", err.message);
+      }
+  
+      // Admin-Mail
+      const adminMailHTML = `
+        <div style="font-family: Arial, sans-serif; max-width:600px; margin:auto; padding:20px; border-radius:8px; background:#f9f9f9; border:1px solid #ddd;">
+          ${logoBase64 ? `<div style="text-align:center; margin-bottom:20px;">
+            <img src="${logoBase64}" alt="Logo" style="max-width:200px;" />
+          </div>` : ''}
+          <h2 style="color:#0073e6;">Neue Anfrage eingegangen</h2>
+          <p><strong>Name:</strong> ${name}</p>
+          <p><strong>Email:</strong> ${email}</p>
+          <p><strong>Nachricht:</strong></p>
+          <p style="padding:10px; background:#fff; border-radius:5px; border:1px solid #ccc;">${nachricht}</p>
+          <p style="font-size:12px; color:#999;">Anfrage-ID: ${anfrageId}</p>
+        </div>
+      `;
+  
+      // Bestätigung an Antragsteller
+      const userMailHTML = `
+        <div style="font-family: Arial, sans-serif; max-width:600px; margin:auto; padding:20px; border-radius:8px; background:#f9f9f9; border:1px solid #ddd;">
+          ${logoBase64 ? `<div style="text-align:center; margin-bottom:20px;">
+            <img src="${logoBase64}" alt="Logo" style="max-width:150px;" />
+          </div>` : ''}
+          <h2 style="color:#0073e6;">Vielen Dank für Ihre Anfrage!</h2>
+          <p>Hallo ${name},</p>
+          <p>Wir haben Ihre Anfrage erfolgreich erhalten und werden uns innerhalb von 24 Stunden bei Ihnen melden.</p>
+          <p><strong>Ihre Nachricht:</strong></p>
+          <p style="padding:10px; background:#fff; border-radius:5px; border:1px solid #ccc;">${nachricht}</p>
+          <p>Bei Fragen kontaktieren Sie uns bitte unter <a href="mailto:info@jugehoerig.ch">info@jugehoerig.ch</a>.</p>
+          <p style="margin-top:20px;">Mit freundlichen Grüßen,<br /><strong>Ihr Jugehoerig Team</strong></p>
+          <p style="font-size:12px; color:#999;">Anfrage-ID: ${anfrageId}</p>
+        </div>
+      `;
+  
+      // Mail an Info@jugehoerig.ch
+      transporter.sendMail({
+        from: MAIL_USER,
+        to: "info@jugehoerig.ch",
+        subject: `Neue Anfrage von ${name}`,
+        html: adminMailHTML
+      }, (err, info) => {
+        if (err) console.error("Fehler Admin-Mail:", err);
+        else console.log("Admin-Mail gesendet:", info.response);
+      });
+  
+      // Bestätigungsmail an Antragsteller
+      transporter.sendMail({
+        from: MAIL_USER,
+        to: email,
+        subject: "Ihre Anfrage bei Jugehoerig wurde empfangen",
+        html: userMailHTML
+      }, (err, info) => {
+        if (err) console.error("Fehler User-Mail:", err);
+        else console.log("Bestätigungsmail gesendet:", info.response);
+      });
+  
       res.status(201).json({
-        message: "Anfrage erfolgreich gespeichert.",
+        message: "Anfrage gespeichert. E-Mail an Info und Bestätigung an Antragsteller gesendet.",
         anfrageId,
       });
+  
     } catch (err) {
       console.error("Fehler beim Erstellen der Anfrage:", err);
       res.status(500).json({ error: "Fehler beim Verarbeiten der Anfrage." });
     }
-  },
+  },  
 
-  // Alle Anfragen abrufen – nur für Vorstände
   getAnfragen: async (req, res) => {
-    if (req.user.userType !== "vorstand") {
-      return res.status(403).json({ error: "Nur Vorstände dürfen Anfragen ansehen." });
-    }
-
+    if (req.user.userType !== "vorstand") return res.status(403).json({ error: "Nur Vorstände dürfen Anfragen ansehen." });
     try {
-      const [rows] = await pool.query(
-        "SELECT * FROM anfragen ORDER BY erstellt_am DESC"
-      );
+      const [rows] = await pool.query("SELECT * FROM anfragen ORDER BY erstellt_am DESC");
       res.json(rows);
     } catch (err) {
       console.error(err);
@@ -60,12 +141,8 @@ const anfrageController = {
     }
   },
 
-  // Einzelne Anfrage abrufen – nur für Vorstände
   getAnfrageById: async (req, res) => {
-    if (req.user.userType !== "vorstand") {
-      return res.status(403).json({ error: "Nur Vorstände dürfen Anfragen ansehen." });
-    }
-
+    if (req.user.userType !== "vorstand") return res.status(403).json({ error: "Nur Vorstände dürfen Anfragen ansehen." });
     const { id } = req.params;
     try {
       const [rows] = await pool.query("SELECT * FROM anfragen WHERE id = ?", [id]);
