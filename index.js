@@ -27,6 +27,7 @@ const homeRouter = require('./routes/home.router');
 const blogsRouter = require('./routes/blogs.router');
 const spendenRouter = require('./routes/spenden.router');
 const anfrageRouter = require('./routes/anfrage.router');
+const postkontaktRouter = require('./routes/postkontakt.router');
 
 const logoRouter = require('./routes/logo.router');
 
@@ -42,6 +43,7 @@ app.use('/api/blogs', blogsRouter);
 app.use('/api/spenden', spendenRouter);
 app.use('/api/anfrage', anfrageRouter);
 app.use('/api/logo', logoRouter);
+app.use('/api/postkontakt', postkontaktRouter);
 
 
 // Fehlerbehandlung
