@@ -22,9 +22,15 @@ const linksController = {
   // 🆕 Neue Section + Links erstellen
   createSectionWithLinks: async (req, res) => {
     try {
-      if (!["vorstand", "admin"].includes(req.user.userType)) {
-        return res.status(403).json({ error: "Nur Admins oder Vorstände dürfen Sections bearbeiten." });
-      }
+    // 🔒 Nur Vorstand/Admin darf Anmeldungen sehen
+    if (
+      !req.user.userTypes ||
+      !Array.isArray(req.user.userTypes) ||
+      !req.user.userTypes.some(role => ["vorstand", "admin"].includes(role))
+    ) {
+      return res.status(403).json({ error: "Nur Vorstände oder Admins dürfen Anmeldungen sehen." });
+    }
+
 
       const { subtitle, links } = req.body;
 
@@ -71,9 +77,15 @@ const linksController = {
   // ✏️ Nur Section bearbeiten (Untertitel ändern)
   updateSectionTitle: async (req, res) => {
     try {
-      if (!["vorstand", "admin"].includes(req.user.userType)) {
-        return res.status(403).json({ error: "Nur Admins oder Vorstände dürfen Sections bearbeiten." });
-      }
+    // 🔒 Nur Vorstand/Admin darf Anmeldungen sehen
+    if (
+      !req.user.userTypes ||
+      !Array.isArray(req.user.userTypes) ||
+      !req.user.userTypes.some(role => ["vorstand", "admin"].includes(role))
+    ) {
+      return res.status(403).json({ error: "Nur Vorstände oder Admins dürfen Anmeldungen sehen." });
+    }
+
 
       const { id } = req.params;
       const { subtitle } = req.body;
@@ -95,9 +107,14 @@ const linksController = {
   // ➕ Link zu bestehender Section hinzufügen
   addLinkToSection: async (req, res) => {
     try {
-      if (!["vorstand", "admin"].includes(req.user.userType)) {
-        return res.status(403).json({ error: "Nur Admins oder Vorstände dürfen Links hinzufügen." });
-      }
+   // 🔒 Nur Vorstand/Admin darf Anmeldungen sehen
+   if (
+    !req.user.userTypes ||
+    !Array.isArray(req.user.userTypes) ||
+    !req.user.userTypes.some(role => ["vorstand", "admin"].includes(role))
+  ) {
+    return res.status(403).json({ error: "Nur Vorstände oder Admins dürfen Anmeldungen sehen." });
+  }
 
       const { sectionId } = req.params;
       const { text, url } = req.body;
@@ -128,9 +145,15 @@ const linksController = {
   // ✏️ Einzelnen Link bearbeiten
   updateSingleLink: async (req, res) => {
     try {
-      if (!["vorstand", "admin"].includes(req.user.userType)) {
-        return res.status(403).json({ error: "Nur Admins oder Vorstände dürfen Links bearbeiten." });
-      }
+    // 🔒 Nur Vorstand/Admin darf Anmeldungen sehen
+    if (
+      !req.user.userTypes ||
+      !Array.isArray(req.user.userTypes) ||
+      !req.user.userTypes.some(role => ["vorstand", "admin"].includes(role))
+    ) {
+      return res.status(403).json({ error: "Nur Vorstände oder Admins dürfen Anmeldungen sehen." });
+    }
+
 
       const { id } = req.params;
       const { text, url } = req.body;
@@ -155,9 +178,15 @@ const linksController = {
  // 🧩 Section bearbeiten (Titel + Links hinzufügen/ändern/löschen)
  editSectionWithLinks: async (req, res) => {
   try {
-    if (!["vorstand", "admin"].includes(req.user.userType)) {
-      return res.status(403).json({ error: "Nur Admins oder Vorstände dürfen Sections bearbeiten." });
-    }
+// 🔒 Nur Vorstand/Admin darf Anmeldungen sehen
+if (
+  !req.user.userTypes ||
+  !Array.isArray(req.user.userTypes) ||
+  !req.user.userTypes.some(role => ["vorstand", "admin"].includes(role))
+) {
+  return res.status(403).json({ error: "Nur Vorstände oder Admins dürfen Anmeldungen sehen." });
+}
+
 
     const { id } = req.params;
     const { subtitle, links } = req.body;
@@ -212,9 +241,15 @@ const linksController = {
 // 🧹 Einzelnen Link löschen
 deleteLink: async (req, res) => {
   try {
-    if (!["vorstand", "admin"].includes(req.user.userType)) {
-      return res.status(403).json({ error: "Nur Admins oder Vorstände dürfen Sections bearbeiten." });
-    }
+  // 🔒 Nur Vorstand/Admin darf Anmeldungen sehen
+  if (
+    !req.user.userTypes ||
+    !Array.isArray(req.user.userTypes) ||
+    !req.user.userTypes.some(role => ["vorstand", "admin"].includes(role))
+  ) {
+    return res.status(403).json({ error: "Nur Vorstände oder Admins dürfen Anmeldungen sehen." });
+  }
+
 
     const { id } = req.params;
     const [result] = await pool.query("DELETE FROM content_links WHERE id = ?", [id]);
@@ -251,9 +286,15 @@ deleteLink: async (req, res) => {
   // 🗑️ Section löschen (mit Links)
   deleteSection: async (req, res) => {
     try {
-      if (!["vorstand", "admin"].includes(req.user.userType)) {
-        return res.status(403).json({ error: "Nur Admins oder Vorstände dürfen Sections bearbeiten." });
-      }
+// 🔒 Nur Vorstand/Admin darf Anmeldungen sehen
+if (
+  !req.user.userTypes ||
+  !Array.isArray(req.user.userTypes) ||
+  !req.user.userTypes.some(role => ["vorstand", "admin"].includes(role))
+) {
+  return res.status(403).json({ error: "Nur Vorstände oder Admins dürfen Anmeldungen sehen." });
+}
+
       const { id } = req.params;
       await pool.query("DELETE FROM content_links WHERE section_id = ?", [id]);
       const [result] = await pool.query("DELETE FROM content_sections WHERE id = ?", [id]);
@@ -270,9 +311,15 @@ deleteLink: async (req, res) => {
   // 🧹 Einzelnen Link löschen
   deleteLink: async (req, res) => {
     try {
-      if (!["vorstand", "admin"].includes(req.user.userType)) {
-        return res.status(403).json({ error: "Nur Admins oder Vorstände dürfen Sections bearbeiten." });
-      }
+// 🔒 Nur Vorstand/Admin darf Anmeldungen sehen
+if (
+  !req.user.userTypes ||
+  !Array.isArray(req.user.userTypes) ||
+  !req.user.userTypes.some(role => ["vorstand", "admin"].includes(role))
+) {
+  return res.status(403).json({ error: "Nur Vorstände oder Admins dürfen Anmeldungen sehen." });
+}
+
 
       const { id } = req.params;
       const [result] = await pool.query("DELETE FROM content_links WHERE id = ?", [id]);
