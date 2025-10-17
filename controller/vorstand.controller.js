@@ -336,12 +336,7 @@ const vorstandController = {
 
   changeMultiplePasswords: async (req, res) => {
     try {
-      // Zugriff nur für Vorstände
-      const userType = req.user.userType;
-      if (userType !== 'vorstand') {
-        return res.status(403).json({ error: "Nur Vorstände dürfen Passwörter ändern." });
-      }
-
+     
       const { updates } = req.body;
 
       if (!Array.isArray(updates) || updates.length === 0) {
