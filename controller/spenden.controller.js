@@ -22,9 +22,14 @@ const spendenController = {
   // EINMALIG Spendeninformationen erstellen
   create: async (req, res) => {
     try {
-      if (req.user.userType !== "vorstand") {
-        return res.status(403).json({ error: "Nur Vorstände dürfen Spendeninfos erstellen." });
-      }
+           // 🔒 Nur Vorstand/Admin darf Anmeldungen sehen
+           if (
+            !req.user.userTypes ||
+            !Array.isArray(req.user.userTypes) ||
+            !req.user.userTypes.some(role => ["vorstand", "admin"].includes(role))
+          ) {
+            return res.status(403).json({ error: "Nur Vorstände oder Admins dürfen Anmeldungen sehen." });
+          }
 
       // Prüfen, ob schon ein Eintrag existiert
       const [existing] = await pool.query("SELECT * FROM spenden LIMIT 1");
@@ -70,9 +75,14 @@ const spendenController = {
   // Den EINEN Datensatz aktualisieren
   update: async (req, res) => {
     try {
-      if (req.user.userType !== "vorstand") {
-        return res.status(403).json({ error: "Nur Vorstände dürfen Spendeninfos aktualisieren." });
-      }
+           // 🔒 Nur Vorstand/Admin darf Anmeldungen sehen
+           if (
+            !req.user.userTypes ||
+            !Array.isArray(req.user.userTypes) ||
+            !req.user.userTypes.some(role => ["vorstand", "admin"].includes(role))
+          ) {
+            return res.status(403).json({ error: "Nur Vorstände oder Admins dürfen Anmeldungen sehen." });
+          }
 
       const { iban, bank, clearing, swift, postcheck, hinweis } = req.body;
       const [existing] = await pool.query("SELECT * FROM spenden LIMIT 1");
@@ -106,10 +116,14 @@ const spendenController = {
   // Den EINEN Datensatz löschen
   delete: async (req, res) => {
     try {
-      if (req.user.userType !== "vorstand") {
-        return res.status(403).json({ error: "Nur Vorstände dürfen Spendeninfos löschen." });
-      }
-
+              // 🔒 Nur Vorstand/Admin darf Anmeldungen sehen
+              if (
+                !req.user.userTypes ||
+                !Array.isArray(req.user.userTypes) ||
+                !req.user.userTypes.some(role => ["vorstand", "admin"].includes(role))
+              ) {
+                return res.status(403).json({ error: "Nur Vorstände oder Admins dürfen Anmeldungen sehen." });
+              }
       const [existing] = await pool.query("SELECT * FROM spenden LIMIT 1");
       if (existing.length === 0) {
         return res.status(404).json({ error: "Keine Spendeninfos vorhanden." });
