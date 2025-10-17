@@ -39,10 +39,7 @@ const anfrageController = {
 
 
   createAnfrage: async (req, res) => {
-    if (req.user.userType !== "vorstand") {
-      return res.status(403).json({ error: "Nur Vorstände dürfen Anfragen erstellen." });
-    }
-  
+
     const { name, email, nachricht } = req.body;
     if (!name || !email || !nachricht) {
       return res.status(400).json({ error: "Name, Email und Nachricht sind Pflichtfelder." });
