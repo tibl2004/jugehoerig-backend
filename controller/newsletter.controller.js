@@ -162,7 +162,7 @@ subscribe: async (req, res) => {
               <p>vielen Dank für deine Anmeldung zu unserem Newsletter. Wir freuen uns, dich an Bord zu haben!</p>
               <p>Falls du den Newsletter irgendwann nicht mehr erhalten möchtest, kannst du dich jederzeit abmelden:</p>
               <div style="text-align: center; margin: 20px 0;">
-                <a href="https://meinverein.de/api/newsletter/unsubscribe?token=${unsubscribeToken}" 
+                <a href="https://jugehoerig-backend.onrender.com/api/newsletter/unsubscribe?token=${unsubscribeToken}" 
                    style="background: #F59422; color: #fff; text-decoration: none; padding: 12px 18px; border-radius: 5px; display: inline-block;">Jetzt abmelden</a>
               </div>
               <p style="font-size: 12px; color: #999; text-align: center;">© ${new Date().getFullYear()} Jugendverein e.V.</p>
