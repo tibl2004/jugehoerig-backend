@@ -235,7 +235,15 @@ subscribe: async (req, res) => {
   // --- Alle Abonnenten abrufen ---
 getAllSubscribers: async (req, res) => {
   try {
-    // keine JWT-Auth mehr
+    // 🔒 Nur Vorstand/Admin darf Anmeldungen sehen
+    if (
+      !req.user.userTypes ||
+      !Array.isArray(req.user.userTypes) ||
+      !req.user.userTypes.some(role => ["vorstand", "admin"].includes(role))
+    ) {
+      return res.status(403).json({ error: "Nur Vorstände oder Admins dürfen Anmeldungen sehen." });
+    }
+
     const [subscribers] = await pool.query(`
       SELECT 
         id, vorname, nachname, email, subscribed_at, unsubscribed_at,
