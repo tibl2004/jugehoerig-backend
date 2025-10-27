@@ -29,6 +29,9 @@ transporter.verify((err, success) => {
   }
 });
 
+if (!checkAdminVorstand(req.user)) return res.status(403).json({ error: "Nur Vorstände/Admins dürfen erstellen." });
+
+
 // ---------------------------------------------------
 
 const newsletterController = {
@@ -49,7 +52,6 @@ const newsletterController = {
   },
   create: async (req, res) => {
     try {
-      if (!checkAdminVorstand(req.user)) return res.status(403).json({ error: "Nur Vorstände/Admins dürfen erstellen." });
 
       const { title, sections, send_date } = req.body;
 
@@ -159,8 +161,9 @@ subscribe: async (req, res) => {
         <table align="center" width="600" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
           <tr>
             <td align="center" style="background-color: #F59422; padding: 20px;">
-              <h1 style="color: #fff; margin: 0;">Jugendverein e.V.</h1>
-            </td>
+            ${logoBase64 ? `<div style="text-align:center; margin-bottom:20px;">
+            <img src="${logoBase64}" alt="Logo" style="max-width:200px;" />
+          </div>` : ''}            </td>
           </tr>
           <tr>
             <td style="padding: 20px;">
@@ -195,41 +198,73 @@ subscribe: async (req, res) => {
 },
 
 
-  // --- Abmelden ---
-  unsubscribe: async (req, res) => {
-    try {
-      const { token } = req.query;
-  
-      if (!token || typeof token !== 'string') {
-        return res.status(400).send('<h3>Fehler: Kein gültiger Abmelde-Token übergeben.</h3>');
-      }
-  
-      const [subscribers] = await pool.query(
-        'SELECT * FROM newsletter_subscribers WHERE unsubscribe_token = ? AND unsubscribed_at IS NULL',
-        [token]
-      );
-  
-      if (!subscribers || subscribers.length === 0) {
-        return res.status(404).send('<h3>Dieser Abmelde-Link ist ungültig oder wurde bereits verwendet.</h3>');
-      }
-  
-      await pool.query(
-        'UPDATE newsletter_subscribers SET unsubscribed_at = NOW() WHERE unsubscribe_token = ?',
-        [token]
-      );
-  
-      return res.send(`
-        <div style="font-family: Arial, sans-serif; text-align: center; margin-top: 50px;">
-          <h2>Du wurdest erfolgreich vom Newsletter abgemeldet.</h2>
-          <p style="color: gray;">Es tut uns leid, dich gehen zu sehen. Du kannst dich jederzeit wieder anmelden.</p>
-          <a href="https://jugehoerig.ch" style="display:inline-block;margin-top:20px;padding:10px 20px;background:#0066cc;color:white;text-decoration:none;border-radius:4px;">Zurück zur Startseite</a>
+unsubscribe: async (req, res) => {
+  try {
+    const { token } = req.query;
+
+    if (!token || typeof token !== 'string') {
+      return res.status(400).send(`
+        <div style="font-family: Arial, sans-serif; background-color: #f0f4f8; min-height: 100vh; display:flex; justify-content:center; align-items:center; padding:20px;">
+          <div style="background:#fff; padding:40px; border-radius:12px; box-shadow:0 12px 25px rgba(0,0,0,0.1); max-width:500px; text-align:center;">
+            <h2 style="color:#F59422; margin-bottom:20px;">Fehler bei der Abmeldung</h2>
+            <p style="color:#555; line-height:1.6;">Der Abmelde-Link ist ungültig oder fehlt. Bitte überprüfe den Link in deiner E-Mail.</p>
+            <a href="https://jugehoerig.ch" style="display:inline-block; margin-top:30px; padding:12px 25px; background:#F59422; color:white; text-decoration:none; border-radius:8px; font-weight:bold;">Zur Startseite</a>
+          </div>
         </div>
       `);
-    } catch (error) {
-      console.error('Fehler beim Abmelden vom Newsletter:', error);
-      return res.status(500).send('<h3>Serverfehler bei der Newsletter-Abmeldung.</h3>');
     }
-  },
+
+    const [subscribers] = await pool.query(
+      'SELECT * FROM newsletter_subscribers WHERE unsubscribe_token = ? AND unsubscribed_at IS NULL',
+      [token]
+    );
+
+    if (!subscribers || subscribers.length === 0) {
+      return res.status(404).send(`
+        <div style="font-family: Arial, sans-serif; background-color: #f0f4f8; min-height: 100vh; display:flex; justify-content:center; align-items:center; padding:20px;">
+          <div style="background:#fff; padding:40px; border-radius:12px; box-shadow:0 12px 25px rgba(0,0,0,0.1); max-width:500px; text-align:center;">
+            <h2 style="color:#F59422; margin-bottom:20px;">Abmeldung nicht möglich</h2>
+            <p style="color:#555; line-height:1.6;">Dieser Abmelde-Link wurde bereits verwendet oder ist ungültig.</p>
+            <a href="https://jugehoerig.ch" style="display:inline-block; margin-top:30px; padding:12px 25px; background:#F59422; color:white; text-decoration:none; border-radius:8px; font-weight:bold;">Zur Startseite</a>
+          </div>
+        </div>
+      `);
+    }
+
+    await pool.query(
+      'UPDATE newsletter_subscribers SET unsubscribed_at = NOW() WHERE unsubscribe_token = ?',
+      [token]
+    );
+
+    return res.send(`
+      <div style="font-family: Arial, sans-serif; background-color: #f0f4f8; min-height: 100vh; display:flex; justify-content:center; align-items:center; padding:20px;">
+        <div style="max-width:550px; width:100%; background:#fff; border-radius:14px; box-shadow:0 12px 25px rgba(0,0,0,0.15); overflow:hidden;">
+          <!-- Orangener Header mit Logo -->
+          <div style="background:#F59422; padding:30px; text-align:center;">
+            ${logoBase64 ? `<img src="${logoBase64}" alt="Jugehörig Logo" style="max-width:180px; margin-bottom:10px; display:block; margin-left:auto; margin-right:auto;">` : ''}
+            <h1 style="color:#fff; font-size:28px; margin:0;">Abmeldung erfolgreich</h1>
+          </div>
+          <!-- Content -->
+          <div style="padding:40px 30px; text-align:center; color:#555; line-height:1.6;">
+            <p>Du wurdest erfolgreich vom Newsletter abgemeldet. Es tut uns leid, dich gehen zu sehen. Du kannst dich jederzeit wieder anmelden.</p>
+            <a href="https://jugehoerig.ch" style="display:inline-block; margin-top:30px; padding:14px 30px; background:#F59422; color:white; text-decoration:none; border-radius:8px; font-weight:bold; box-shadow:0 4px 12px rgba(0,0,0,0.1); transition: all 0.3s;">Zur Startseite</a>
+          </div>
+        </div>
+      </div>
+    `);
+  } catch (error) {
+    console.error('Fehler beim Abmelden vom Newsletter:', error);
+    return res.status(500).send(`
+      <div style="font-family: Arial, sans-serif; background-color: #f0f4f8; min-height:100vh; display:flex; justify-content:center; align-items:center; padding:20px;">
+        <div style="background:#fff; padding:40px; border-radius:12px; box-shadow:0 12px 25px rgba(0,0,0,0.1); max-width:500px; text-align:center;">
+          <h2 style="color:#dc3545; margin-bottom:20px;">Serverfehler</h2>
+          <p style="color:#555; line-height:1.6;">Beim Abmelden ist ein Fehler aufgetreten. Bitte versuche es später erneut.</p>
+          <a href="https://jugehoerig.ch" style="display:inline-block; margin-top:30px; padding:12px 25px; background:#F59422; color:white; text-decoration:none; border-radius:8px; font-weight:bold;">Zur Startseite</a>
+        </div>
+      </div>
+    `);
+  }
+},
   
 
   // --- Alle Abonnenten abrufen ---
