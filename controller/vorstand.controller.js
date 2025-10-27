@@ -24,15 +24,14 @@ const vorstandController = {
 
   createVorstand: async (req, res) => {
     try {
-      // 🔒 Nur Vorstand/Admin darf Anmeldungen sehen
-      if (
+       // 🔒 Nur Vorstand/Admin darf Anmeldungen sehen
+       if (
         !req.user.userTypes ||
         !Array.isArray(req.user.userTypes) ||
         !req.user.userTypes.some(role => ["vorstand", "admin"].includes(role))
       ) {
         return res.status(403).json({ error: "Nur Vorstände oder Admins dürfen Anmeldungen sehen." });
       }
-
 
       const {
         geschlecht,
