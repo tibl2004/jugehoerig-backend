@@ -29,7 +29,6 @@ transporter.verify((err, success) => {
   }
 });
 
-if (!checkAdminVorstand(req.user)) return res.status(403).json({ error: "Nur Vorstände/Admins dürfen erstellen." });
 
 
 // ---------------------------------------------------
