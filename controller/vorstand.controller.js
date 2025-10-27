@@ -24,14 +24,13 @@ const vorstandController = {
 
   createVorstand: async (req, res) => {
     try {
-      // Nur vorstands, die auch im Vorstand sind, dürfen neue Vorstandsmitglieder erstellen
+      // 🔒 Nur Vorstand/Admin darf Anmeldungen sehen
       if (
         !req.user.userTypes ||
         !Array.isArray(req.user.userTypes) ||
-        !req.user.userTypes.includes('vorstand') ||
-        !req.user.userTypes.includes('vorstand')
+        !req.user.userTypes.some(role => ["vorstand", "admin"].includes(role))
       ) {
-        return res.status(403).json({ error: 'Nur Benutzer mit vorstand- und Vorstandrechten dürfen einen Vorstand erstellen.' });
+        return res.status(403).json({ error: "Nur Vorstände oder Admins dürfen Anmeldungen sehen." });
       }
 
 
