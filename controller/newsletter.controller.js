@@ -2,6 +2,8 @@ const pool = require('../database/index'); // mysql2/promise pool
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const sharp = require('sharp');
+const axios = require("axios");
+
 
 // ------------------ Konfiguration ------------------
 const MAIL_USER = 'no-reply.jugehoerig@gmx.ch';
@@ -153,6 +155,17 @@ subscribe: async (req, res) => {
         [vorname, nachname, email, unsubscribeToken]
       );
     }
+ // Logo Base64 über API abrufen
+ let logoBase64 = null;
+ try {
+   const logoRes = await axios.get("https://jugehoerig-backend.onrender.com/api/logo");
+   if (logoRes.data.logoUrl) {
+     // Base64 Data-URL für Mail erstellen
+     logoBase64 = `data:image/png;base64,${logoRes.data.logoUrl}`;
+   }
+ } catch (err) {
+   console.error("Logo konnte nicht geladen werden:", err.message);
+ }
 
     // --- HTML Bestätigungs-Mail ---
     const html = `
@@ -183,7 +196,7 @@ subscribe: async (req, res) => {
 
     // Mail senden
     await transporter.sendMail({
-      from: `"Jugendverein" <${MAIL_USER}>`,
+      from: `"Jugehörig" <${MAIL_USER}>`,
       to: email,
       subject: 'Willkommen zu unserem Newsletter!',
       html,
@@ -200,6 +213,19 @@ subscribe: async (req, res) => {
 unsubscribe: async (req, res) => {
   try {
     const { token } = req.query;
+
+     // Logo Base64 über API abrufen
+     let logoBase64 = null;
+     try {
+       const logoRes = await axios.get("https://jugehoerig-backend.onrender.com/api/logo");
+       if (logoRes.data.logoUrl) {
+         // Base64 Data-URL für Mail erstellen
+         logoBase64 = `data:image/png;base64,${logoRes.data.logoUrl}`;
+       }
+     } catch (err) {
+       console.error("Logo konnte nicht geladen werden:", err.message);
+     }
+
 
     if (!token || typeof token !== 'string') {
       return res.status(400).send(`
