@@ -22,15 +22,16 @@ const vorstandController = {
     });
   },
 
+  // 🔹 Vorstand erstellen
   createVorstand: async (req, res) => {
     try {
-       // 🔒 Nur Vorstand/Admin darf Anmeldungen sehen
-       if (
-        !req.user.userTypes ||
+      // 🔒 Nur Vorstand/Admin darf erstellen
+      if (
+        !req.user?.userTypes ||
         !Array.isArray(req.user.userTypes) ||
         !req.user.userTypes.some(role => ["vorstand", "admin"].includes(role))
       ) {
-        return res.status(403).json({ error: "Nur Vorstände oder Admins dürfen Anmeldungen sehen." });
+        return res.status(403).json({ error: "Nur Vorstände oder Admins dürfen neue Vorstände erstellen." });
       }
 
       const {
@@ -44,11 +45,12 @@ const vorstandController = {
         passwort,
         telefon,
         email,
-        foto, // Erwartet als vollständiger Base64-String mit Präfix
+        foto, // Erwartet Base64 mit Prefix
         beschreibung,
         rolle
       } = req.body;
 
+      // 🔸 Pflichtfelder prüfen
       if (
         !geschlecht || !vorname || !nachname || !adresse || !plz || !ort ||
         !benutzername || !passwort || !telefon || !email || !rolle
@@ -56,44 +58,43 @@ const vorstandController = {
         return res.status(400).json({ error: "Alle Pflichtfelder inklusive Rolle müssen ausgefüllt sein." });
       }
 
-      // Falls Foto mitgeliefert wird, prüfe das Format und wandle es in PNG um
-      let base64Foto = null;
+      // 🔸 Benutzername darf nicht doppelt vorkommen
+      const [existing] = await pool.query(
+        "SELECT id FROM vorstand WHERE benutzername = ?",
+        [benutzername]
+      );
+      if (existing.length > 0) {
+        return res.status(409).json({ error: "Benutzername bereits vergeben." });
+      }
+
+      // 🔸 Passwort hashen
+      const hashedPassword = await bcrypt.hash(passwort, 10);
+
+      // 🔸 Foto prüfen und konvertieren (optional)
+      let fotoBase64 = null;
       if (foto) {
         const matches = foto.match(/^data:(image\/[a-zA-Z]+);base64,(.+)$/);
         if (!matches || matches.length !== 3) {
-          return res.status(400).json({ error: 'Ungültiges Bildformat. Erwarte Base64-String mit data:image/... Prefix.' });
+          return res.status(400).json({ error: "Ungültiges Bildformat. Erwarte Base64 mit data:image/... Prefix." });
         }
 
         const mimeType = matches[1];
         const base64Data = matches[2];
-        const buffer = Buffer.from(base64Data, 'base64');
+        const buffer = Buffer.from(base64Data, "base64");
 
-        // Optional: nur bestimmte Formate zulassen
-        if (!['image/png', 'image/jpeg', 'image/jpg', 'image/webp'].includes(mimeType)) {
-          return res.status(400).json({ error: 'Nur PNG, JPEG, JPG oder WEBP erlaubt.' });
+        if (!["image/png", "image/jpeg", "image/jpg", "image/webp"].includes(mimeType)) {
+          return res.status(400).json({ error: "Nur PNG, JPEG, JPG oder WEBP erlaubt." });
         }
 
-        const convertedBuffer = await sharp(buffer).resize(400).png().toBuffer();
-        base64Foto = convertedBuffer.toString('base64'); // Reines Base64 ohne Prefix
+        const resized = await sharp(buffer).resize(400).png().toBuffer();
+        fotoBase64 = resized.toString("base64");
       }
 
-      // Benutzername darf nicht doppelt vorkommen
-      const [existingUser] = await pool.query(
-        'SELECT id FROM vorstand WHERE benutzername = ?',
-        [benutzername]
-      );
-      if (existingUser.length > 0) {
-        return res.status(409).json({ error: 'Benutzername bereits vergeben.' });
-      }
-
-      // Passwort verschlüsseln
-      const hashedPassword = await bcrypt.hash(passwort, 10);
-
-      // In DB speichern
+      // 🔸 Eintrag in DB
       await pool.query(
         `INSERT INTO vorstand 
           (geschlecht, vorname, nachname, adresse, plz, ort, benutzername, passwort, telefon, email, foto, beschreibung, rolle)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           geschlecht,
           vorname,
@@ -105,18 +106,19 @@ const vorstandController = {
           hashedPassword,
           telefon,
           email,
-          base64Foto,
+          fotoBase64,
           beschreibung || null,
           rolle
         ]
       );
 
-      res.status(201).json({ message: 'Vorstand erfolgreich erstellt.' });
+      res.status(201).json({ message: "Vorstand erfolgreich erstellt." });
     } catch (error) {
-      console.error('Fehler beim Erstellen des Vorstands:', error);
-      res.status(500).json({ error: 'Fehler beim Erstellen des Vorstands.' });
+      console.error("❌ Fehler beim Erstellen des Vorstands:", error);
+      res.status(500).json({ error: "Fehler beim Erstellen des Vorstands." });
     }
   },
+
 
 
   getVorstand: async (req, res) => {

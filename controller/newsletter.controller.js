@@ -106,15 +106,22 @@ const newsletterController = {
 
 
   // --- Alle Newsletter abrufen ---
-  getAll: async (req, res) => {
-    try {
-      const [newsletters] = await pool.query('SELECT * FROM newsletter ORDER BY created_at DESC');
-      res.json(newsletters);
-    } catch (error) {
-      console.error('Fehler beim Abrufen der Newsletter:', error);
-      res.status(500).json({ error: 'Fehler beim Abrufen der Newsletter' });
-    }
-  },
+// --- Alle veröffentlichten Newsletter (Archiv) ---
+getAll: async (req, res) => {
+  try {
+    const [newsletters] = await pool.query(`
+      SELECT * 
+      FROM newsletter 
+      WHERE is_sent = 1
+      ORDER BY send_date DESC
+    `);
+    res.json(newsletters);
+  } catch (error) {
+    console.error('Fehler beim Abrufen der Newsletter:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen der Newsletter' });
+  }
+},
+
 
   // --- Einzelnen Newsletter abrufen ---
   getById: async (req, res) => {
