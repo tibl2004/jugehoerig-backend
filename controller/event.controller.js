@@ -379,6 +379,15 @@ const eventController = {
          ORDER BY created_at DESC`,
         [eventId]
       );
+
+       // 🔹 Formularfeldnamen laden
+    const [felder] = await connection.query(
+      `SELECT feldname FROM event_formulare WHERE event_id = ? ORDER BY id ASC`,
+      [eventId]
+    );
+
+    const feldnamen = felder.map(f => f.feldname);
+
   
       // ❌ ALLE bekannten Event-Keys (DIESE RAUSFILTERN)
       const EVENT_KEYS = new Set([
@@ -418,6 +427,7 @@ const eventController = {
       });
   
       res.status(200).json({
+        feldnamen,
         registrations
       });
   
