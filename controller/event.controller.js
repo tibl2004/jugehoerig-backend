@@ -357,7 +357,7 @@ const eventController = {
     }
   },
 
-  getRegistrations: async (req, res) => {
+  getRegistrationFields: async (req, res) => {
     let connection;
     try {
       // 🔒 Nur Vorstand / Admin
@@ -371,33 +371,13 @@ const eventController = {
       const eventId = req.params.id;
       connection = await pool.getConnection();
   
-      // 🔹 1. Hole die Felddefinitionen des Events
-      const [formRows] = await connection.query(
-        `SELECT id, feldname, typ, pflicht, optionen
-         FROM event_formulare
-         WHERE event_id = ?
-         ORDER BY id ASC`,
-        [eventId]
-      );
-  
-      const felder = formRows.map(f => ({
-        id: f.id,
-        feldname: f.feldname,
-        typ: f.typ,
-        pflicht: !!f.pflicht,
-        optionen: f.optionen ? JSON.parse(f.optionen) : []
-      }));
-  
-      // 🔹 2. Hole alle Registrierungen des Events
+      // 1️⃣ Hole alle Registrierungen
       const [rows] = await connection.query(
-        `SELECT id, daten, created_at
-         FROM event_anmeldungen
-         WHERE event_id = ?
-         ORDER BY created_at DESC`,
+        `SELECT daten FROM event_anmeldungen WHERE event_id = ?`,
         [eventId]
       );
   
-      // ❌ ALLE bekannten Event-Metadaten keys rausfiltern
+      // ❌ Bekannte Event-Metadaten rausfiltern
       const EVENT_KEYS = new Set([
         "titel",
         "beschreibung",
@@ -412,40 +392,30 @@ const eventController = {
         "felder"
       ]);
   
-      const registrations = rows.map(row => {
+      // 2️⃣ Alle Feldnamen aus den Registrierungen sammeln
+      const fieldSet = new Set();
+      rows.forEach(row => {
         let parsed = {};
         try {
           parsed = row.daten ? JSON.parse(row.daten) : {};
         } catch {}
-  
-        const formularDaten = {};
-  
-        // ✅ Nur die Formularantworten behalten
         Object.keys(parsed).forEach(key => {
-          if (!EVENT_KEYS.has(key)) {
-            formularDaten[key] = parsed[key];
-          }
+          if (!EVENT_KEYS.has(key)) fieldSet.add(key);
         });
-  
-        return {
-          id: row.id,
-          daten: formularDaten,
-          created_at: row.created_at
-        };
       });
   
-      res.status(200).json({
-        felder,          // Felddefinitionen (für Tabellenheader)
-        registrations    // Teilnehmerdaten
-      });
+      // 3️⃣ In Array umwandeln und zurückgeben
+      const feldnamen = Array.from(fieldSet);
+  
+      res.status(200).json({ feldnamen });
   
     } catch (err) {
       console.error(err);
-      res.status(500).json({ error: "Fehler beim Laden der Anmeldungen." });
+      res.status(500).json({ error: "Fehler beim Laden der Feldnamen." });
     } finally {
       if (connection) connection.release();
     }
-  },
+  },  
   
   
   
