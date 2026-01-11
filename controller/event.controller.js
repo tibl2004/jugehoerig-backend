@@ -392,28 +392,13 @@ const eventController = {
         [eventId]
       );
   
-      // ❌ Bekannte Event-Metadaten rausfiltern
-      const EVENT_KEYS = new Set([
-        "titel",
-        "beschreibung",
-        "ort",
-        "von",
-        "bis",
-        "alle",
-        "supporter",
-        "bild",
-        "bildtitel",
-        "preise",
-        "felder"
-      ]);
-  
       const registrations = rows.map(row => {
         let parsed = {};
         try {
           parsed = row.daten ? JSON.parse(row.daten) : {};
         } catch {}
   
-        // ✅ Nur Formularfelder behalten, aber **nicht filtern, wenn es in EVENT_KEYS steht** – Feldernamen vom Formular steuern das
+        // ✅ NUR Formularfelder extrahieren
         const gefilterteDaten = {};
         feldnamen.forEach(name => {
           if (parsed[name] !== undefined) {
@@ -429,8 +414,8 @@ const eventController = {
       });
   
       res.status(200).json({
-        felder: feldnamen,       // 🔹 Feldnamen des Events
-        registrations            // 🔹 Daten aller Anmeldungen, nur die Formularfelder
+        felder: feldnamen,
+        registrations
       });
   
     } catch (err) {
