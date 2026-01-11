@@ -372,49 +372,52 @@ const eventController = {
       const eventId = req.params.id;
       connection = await pool.getConnection();
   
-      // 🔹 Formularfelder laden
-      const [felder] = await connection.query(
-        `SELECT feldname 
-         FROM event_formulare 
-         WHERE event_id = ? 
-         ORDER BY id ASC`,
-        [eventId]
-      );
-  
-      const feldnamen = felder.map(f => f.feldname);
-  
-      // 🔹 Anmeldungen laden
       const [rows] = await connection.query(
-        `SELECT id, daten, created_at 
-         FROM event_anmeldungen 
-         WHERE event_id = ? 
+        `SELECT id, daten, created_at
+         FROM event_anmeldungen
+         WHERE event_id = ?
          ORDER BY created_at DESC`,
         [eventId]
       );
+  
+      // ❌ ALLE bekannten Event-Keys (DIESE RAUSFILTERN)
+      const EVENT_KEYS = new Set([
+        "titel",
+        "beschreibung",
+        "ort",
+        "von",
+        "bis",
+        "alle",
+        "supporter",
+        "bild",
+        "bildtitel",
+        "preise",
+        "felder"
+      ]);
   
       const registrations = rows.map(row => {
         let parsed = {};
         try {
           parsed = row.daten ? JSON.parse(row.daten) : {};
         } catch {}
+        
+        const formularDaten = {};
   
-        // ✅ NUR Formularfelder extrahieren
-        const gefilterteDaten = {};
-        feldnamen.forEach(name => {
-          if (parsed[name] !== undefined) {
-            gefilterteDaten[name] = parsed[name];
+        // ✅ NUR Formular-Antworten behalten
+        Object.keys(parsed).forEach(key => {
+          if (!EVENT_KEYS.has(key)) {
+            formularDaten[key] = parsed[key];
           }
         });
   
         return {
           id: row.id,
-          daten: gefilterteDaten,
+          daten: formularDaten,
           created_at: row.created_at
         };
       });
   
       res.status(200).json({
-        felder: feldnamen,
         registrations
       });
   
