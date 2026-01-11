@@ -371,6 +371,24 @@ const eventController = {
       const eventId = req.params.id;
       connection = await pool.getConnection();
   
+      // 🔹 1. Hole die Felddefinitionen des Events
+      const [formRows] = await connection.query(
+        `SELECT id, feldname, typ, pflicht, optionen
+         FROM event_formulare
+         WHERE event_id = ?
+         ORDER BY id ASC`,
+        [eventId]
+      );
+  
+      const felder = formRows.map(f => ({
+        id: f.id,
+        feldname: f.feldname,
+        typ: f.typ,
+        pflicht: !!f.pflicht,
+        optionen: f.optionen ? JSON.parse(f.optionen) : []
+      }));
+  
+      // 🔹 2. Hole alle Registrierungen des Events
       const [rows] = await connection.query(
         `SELECT id, daten, created_at
          FROM event_anmeldungen
@@ -379,7 +397,7 @@ const eventController = {
         [eventId]
       );
   
-      // ❌ ALLE bekannten Event-Keys (DIESE RAUSFILTERN)
+      // ❌ ALLE bekannten Event-Metadaten keys rausfiltern
       const EVENT_KEYS = new Set([
         "titel",
         "beschreibung",
@@ -402,7 +420,7 @@ const eventController = {
   
         const formularDaten = {};
   
-        // ✅ NUR Formular-Antworten behalten
+        // ✅ Nur die Formularantworten behalten
         Object.keys(parsed).forEach(key => {
           if (!EVENT_KEYS.has(key)) {
             formularDaten[key] = parsed[key];
@@ -417,7 +435,8 @@ const eventController = {
       });
   
       res.status(200).json({
-        registrations
+        felder,          // Felddefinitionen (für Tabellenheader)
+        registrations    // Teilnehmerdaten
       });
   
     } catch (err) {
@@ -427,6 +446,7 @@ const eventController = {
       if (connection) connection.release();
     }
   },
+  
   
   
   
