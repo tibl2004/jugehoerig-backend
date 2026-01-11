@@ -362,10 +362,7 @@ const eventController = {
     let connection;
     try {
       // 🔒 Nur Vorstand / Admin
-      if (
-        !req.user?.userTypes ||
-        !req.user.userTypes.some(r => ["vorstand", "admin"].includes(r))
-      ) {
+      if (!req.user?.userTypes || !req.user.userTypes.some(r => ["vorstand", "admin"].includes(r))) {
         return res.status(403).json({ error: "Keine Berechtigung." });
       }
   
@@ -388,33 +385,16 @@ const eventController = {
         [eventId]
       );
   
-      // ❌ Event Keys rausfiltern
-      const EVENT_KEYS = new Set([
-        "titel",
-        "beschreibung",
-        "ort",
-        "von",
-        "bis",
-        "alle",
-        "supporter",
-        "bild",
-        "bildtitel",
-        "preise",
-        "felder"
-      ]);
-  
       const registrations = rows.map(row => {
         let parsed = {};
         try {
           parsed = row.daten ? JSON.parse(row.daten) : {};
         } catch {}
   
+        // ✅ Alle Feldnamen abbilden, auch wenn leer
         const formularDaten = {};
-        // ✅ Nur Daten der Formularfelder übernehmen, Event-Keys ignorieren
-        Object.keys(parsed).forEach(key => {
-          if (!EVENT_KEYS.has(key)) {
-            formularDaten[key] = parsed[key];
-          }
+        feldnamen.forEach(name => {
+          formularDaten[name] = parsed[name] !== undefined ? parsed[name] : "";
         });
   
         return {
@@ -424,10 +404,9 @@ const eventController = {
         };
       });
   
-      // 🔹 Alles zurückgeben
       res.status(200).json({
-        feldnamen,      // Nur Feldnamen aus event_formulare
-        registrations   // Registrations mit gefilterten Daten
+        feldnamen,
+        registrations
       });
   
     } catch (err) {
@@ -437,6 +416,7 @@ const eventController = {
       if (connection) connection.release();
     }
   },
+  
   
   
   
