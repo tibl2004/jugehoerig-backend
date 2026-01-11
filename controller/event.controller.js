@@ -371,15 +371,27 @@ const eventController = {
       const eventId = req.params.id;
       connection = await pool.getConnection();
   
+      // 🔹 Formularfelder laden
+      const [felder] = await connection.query(
+        `SELECT feldname 
+         FROM event_formulare 
+         WHERE event_id = ? 
+         ORDER BY id ASC`,
+        [eventId]
+      );
+  
+      const feldnamen = felder.map(f => f.feldname);
+  
+      // 🔹 Anmeldungen laden
       const [rows] = await connection.query(
-        `SELECT id, daten, created_at
-         FROM event_anmeldungen
-         WHERE event_id = ?
+        `SELECT id, daten, created_at 
+         FROM event_anmeldungen 
+         WHERE event_id = ? 
          ORDER BY created_at DESC`,
         [eventId]
       );
   
-      // ❌ ALLE bekannten Event-Keys (DIESE RAUSFILTERN)
+      // ❌ Bekannte Event-Metadaten rausfiltern
       const EVENT_KEYS = new Set([
         "titel",
         "beschreibung",
@@ -399,24 +411,24 @@ const eventController = {
         try {
           parsed = row.daten ? JSON.parse(row.daten) : {};
         } catch {}
-        
-        const formularDaten = {};
   
-        // ✅ NUR Formular-Antworten behalten
-        Object.keys(parsed).forEach(key => {
-          if (!EVENT_KEYS.has(key)) {
-            formularDaten[key] = parsed[key];
+        // ✅ Nur die Felder aus dem Formular behalten
+        const gefilterteDaten = {};
+        feldnamen.forEach(name => {
+          if (parsed[name] !== undefined && !EVENT_KEYS.has(name)) {
+            gefilterteDaten[name] = parsed[name];
           }
         });
   
         return {
           id: row.id,
-          daten: formularDaten,
+          daten: gefilterteDaten,
           created_at: row.created_at
         };
       });
   
       res.status(200).json({
+        felder: feldnamen,
         registrations
       });
   
@@ -426,7 +438,7 @@ const eventController = {
     } finally {
       if (connection) connection.release();
     }
-  },
+  },  
   
   
   
