@@ -357,7 +357,7 @@ const eventController = {
     }
   },
 
-  getRegistrationFields: async (req, res) => {
+  getRegistrations: async (req, res) => {
     let connection;
     try {
       // 🔒 Nur Vorstand / Admin
