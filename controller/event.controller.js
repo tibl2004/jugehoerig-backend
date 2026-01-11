@@ -357,6 +357,7 @@ const eventController = {
     }
   },
 
+
   getRegistrations: async (req, res) => {
     let connection;
     try {
@@ -412,10 +413,10 @@ const eventController = {
           parsed = row.daten ? JSON.parse(row.daten) : {};
         } catch {}
   
-        // ✅ Nur die Felder aus dem Formular behalten
+        // ✅ Nur Formularfelder behalten, aber **nicht filtern, wenn es in EVENT_KEYS steht** – Feldernamen vom Formular steuern das
         const gefilterteDaten = {};
         feldnamen.forEach(name => {
-          if (parsed[name] !== undefined && !EVENT_KEYS.has(name)) {
+          if (parsed[name] !== undefined) {
             gefilterteDaten[name] = parsed[name];
           }
         });
@@ -428,8 +429,8 @@ const eventController = {
       });
   
       res.status(200).json({
-        felder: feldnamen,
-        registrations
+        felder: feldnamen,       // 🔹 Feldnamen des Events
+        registrations            // 🔹 Daten aller Anmeldungen, nur die Formularfelder
       });
   
     } catch (err) {
@@ -438,7 +439,8 @@ const eventController = {
     } finally {
       if (connection) connection.release();
     }
-  },  
+  },
+  
   
   
   
