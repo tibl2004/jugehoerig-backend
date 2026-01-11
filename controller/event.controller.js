@@ -372,6 +372,14 @@ const eventController = {
       const eventId = req.params.id;
       connection = await pool.getConnection();
   
+      // 🔹 Formularfeldnamen laden
+      const [felder] = await connection.query(
+        `SELECT feldname FROM event_formulare WHERE event_id = ? ORDER BY id ASC`,
+        [eventId]
+      );
+      const feldnamen = felder.map(f => f.feldname);
+  
+      // 🔹 Anmeldungen laden
       const [rows] = await connection.query(
         `SELECT id, daten, created_at
          FROM event_anmeldungen
@@ -379,27 +387,30 @@ const eventController = {
          ORDER BY created_at DESC`,
         [eventId]
       );
-
-       // 🔹 Formularfeldnamen laden
-    const [felder] = await connection.query(
-      `SELECT feldname FROM event_formulare WHERE event_id = ? ORDER BY id ASC`,
-      [eventId]
-    );
-
-    const feldnamen = felder.map(f => f.feldname);
-
   
-  
+      // ❌ Event Keys rausfiltern
+      const EVENT_KEYS = new Set([
+        "titel",
+        "beschreibung",
+        "ort",
+        "von",
+        "bis",
+        "alle",
+        "supporter",
+        "bild",
+        "bildtitel",
+        "preise",
+        "felder"
+      ]);
   
       const registrations = rows.map(row => {
         let parsed = {};
         try {
           parsed = row.daten ? JSON.parse(row.daten) : {};
         } catch {}
-        
-        const formularDaten = {};
   
-        // ✅ NUR Formular-Antworten behalten
+        const formularDaten = {};
+        // ✅ Nur Daten der Formularfelder übernehmen, Event-Keys ignorieren
         Object.keys(parsed).forEach(key => {
           if (!EVENT_KEYS.has(key)) {
             formularDaten[key] = parsed[key];
@@ -413,9 +424,10 @@ const eventController = {
         };
       });
   
+      // 🔹 Alles zurückgeben
       res.status(200).json({
-        feldnamen,
-        registrations
+        feldnamen,      // Nur Feldnamen aus event_formulare
+        registrations   // Registrations mit gefilterten Daten
       });
   
     } catch (err) {
@@ -425,6 +437,7 @@ const eventController = {
       if (connection) connection.release();
     }
   },
+  
   
   
   
