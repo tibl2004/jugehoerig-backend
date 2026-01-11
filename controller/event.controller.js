@@ -372,6 +372,14 @@ const eventController = {
       const eventId = req.params.id;
       connection = await pool.getConnection();
   
+      // 🔹 Formularfeldnamen aus der DB
+      const [felder] = await connection.query(
+        `SELECT feldname FROM event_formulare WHERE event_id = ? ORDER BY id ASC`,
+        [eventId]
+      );
+      const feldnamen = felder.map(f => f.feldname);
+  
+      // 🔹 Registrierungen laden
       const [rows] = await connection.query(
         `SELECT id, daten, created_at
          FROM event_anmeldungen
@@ -379,17 +387,8 @@ const eventController = {
          ORDER BY created_at DESC`,
         [eventId]
       );
-
-       // 🔹 Formularfeldnamen laden
-    const [felder] = await connection.query(
-      `SELECT feldname FROM event_formulare WHERE event_id = ? ORDER BY id ASC`,
-      [eventId]
-    );
-
-    const feldnamen = felder.map(f => f.feldname);
-
   
-      // ❌ ALLE bekannten Event-Keys (DIESE RAUSFILTERN)
+      // ❌ Alle bekannten Event-Keys, die nicht angezeigt werden sollen
       const EVENT_KEYS = new Set([
         "titel",
         "beschreibung",
@@ -409,26 +408,25 @@ const eventController = {
         try {
           parsed = row.daten ? JSON.parse(row.daten) : {};
         } catch {}
-        
-        const formularDaten = {};
   
-        // ✅ NUR Formular-Antworten behalten
-        Object.keys(parsed).forEach(key => {
-          if (!EVENT_KEYS.has(key)) {
-            formularDaten[key] = parsed[key];
+        // ✅ Nur die Formularfelder aus der DB behalten, die nicht in EVENT_KEYS sind
+        const gefilterteDaten = {};
+        feldnamen.forEach(name => {
+          if (!EVENT_KEYS.has(name)) {
+            gefilterteDaten[name] = parsed[name] || "";
           }
         });
   
         return {
           id: row.id,
-          daten: formularDaten,
+          daten: gefilterteDaten,
           created_at: row.created_at
         };
       });
   
       res.status(200).json({
-        feldnamen,
-        registrations
+        feldnamen,       // Alle Feldnamen aus der DB
+        registrations    // Registrations mit gefilterten Werten
       });
   
     } catch (err) {
