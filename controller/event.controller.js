@@ -360,32 +360,29 @@ const eventController = {
   getRegistrations: async (req, res) => {
     let connection;
     try {
-      // 🔒 Zugriff nur Vorstand/Admin
+      // 🔒 Nur Vorstand / Admin
       if (
         !req.user?.userTypes ||
-        !Array.isArray(req.user.userTypes) ||
         !req.user.userTypes.some(r => ["vorstand", "admin"].includes(r))
       ) {
         return res.status(403).json({ error: "Keine Berechtigung." });
       }
   
       const eventId = req.params.id;
-      if (!eventId) {
-        return res.status(400).json({ error: "Event-ID fehlt." });
-      }
-  
       connection = await pool.getConnection();
   
-      // 🔹 Formularfelder (Meta, optional)
+      // 🔹 Formularfelder laden
       const [felder] = await connection.query(
-        `SELECT feldname, typ, pflicht 
+        `SELECT feldname 
          FROM event_formulare 
          WHERE event_id = ? 
          ORDER BY id ASC`,
         [eventId]
       );
   
-      // 🔹 ALLE Anmeldungen laden
+      const feldnamen = felder.map(f => f.feldname);
+  
+      // 🔹 Anmeldungen laden
       const [rows] = await connection.query(
         `SELECT id, daten, created_at 
          FROM event_anmeldungen 
@@ -394,43 +391,40 @@ const eventController = {
         [eventId]
       );
   
-      // 🔹 KEINE Anmeldungen
-      if (!rows.length) {
-        return res.status(200).json({
-          felder,
-          registrations: [],
-          message: "Noch keine Anmeldungen vorhanden."
-        });
-      }
-  
-      // 🔹 Anmeldungen sauber parsen (JSON 그대로!)
       const registrations = rows.map(row => {
-        let parsedDaten = {};
+        let parsed = {};
         try {
-          parsedDaten = row.daten ? JSON.parse(row.daten) : {};
-        } catch (e) {
-          console.warn("JSON Parse Fehler bei Anmeldung:", row.id);
-        }
+          parsed = row.daten ? JSON.parse(row.daten) : {};
+        } catch {}
+  
+        // ✅ NUR Formularfelder extrahieren
+        const gefilterteDaten = {};
+        feldnamen.forEach(name => {
+          if (parsed[name] !== undefined) {
+            gefilterteDaten[name] = parsed[name];
+          }
+        });
   
         return {
           id: row.id,
-          daten: parsedDaten,
+          daten: gefilterteDaten,
           created_at: row.created_at
         };
       });
   
       res.status(200).json({
-        felder,        // Formular-Metadaten
-        registrations  // EXAKT gespeicherte Daten
+        felder: feldnamen,
+        registrations
       });
   
-    } catch (error) {
-      console.error("Fehler beim Abrufen der Anmeldungen:", error);
-      res.status(500).json({ error: "Fehler beim Abrufen der Anmeldungen." });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "Fehler beim Laden der Anmeldungen." });
     } finally {
       if (connection) connection.release();
     }
   },
+  
   
 
   getNextEventId: async (req, res) => {
