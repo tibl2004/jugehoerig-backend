@@ -360,48 +360,78 @@ const eventController = {
   getRegistrations: async (req, res) => {
     let connection;
     try {
-      if (!req.user.userTypes || !Array.isArray(req.user.userTypes) || 
-          !req.user.userTypes.some(role => ["vorstand", "admin"].includes(role))) {
-        return res.status(403).json({ error: "Nur Vorstände oder Admins dürfen Anmeldungen sehen." });
+      // 🔒 Zugriff nur Vorstand/Admin
+      if (
+        !req.user?.userTypes ||
+        !Array.isArray(req.user.userTypes) ||
+        !req.user.userTypes.some(r => ["vorstand", "admin"].includes(r))
+      ) {
+        return res.status(403).json({ error: "Keine Berechtigung." });
       }
-
+  
       const eventId = req.params.id;
-      if (!eventId) return res.status(400).json({ error: "Event-ID fehlt." });
-
-      connection = await pool.getConnection();
-
-      const [felder] = await connection.query(
-        `SELECT feldname, pflicht FROM event_formulare WHERE event_id = ? ORDER BY id ASC`,
-        [eventId]
-      );
-
-      const [rows] = await connection.query(
-        `SELECT id, daten, created_at FROM event_anmeldungen WHERE event_id = ? ORDER BY created_at DESC`,
-        [eventId]
-      );
-
-      if (rows.length === 0) {
-        return res.status(200).json({ felder, registrations: [], message: "Bis jetzt gibt es noch keine Anmeldungen." });
+      if (!eventId) {
+        return res.status(400).json({ error: "Event-ID fehlt." });
       }
-
-      const registrations = rows.map(r => {
-        let datenObj = {};
-        try { datenObj = r.daten ? JSON.parse(r.daten) : {}; } catch { datenObj = {}; }
-
-        const feldDaten = {};
-        felder.forEach(feld => { feldDaten[feld.feldname] = datenObj[feld.feldname] || null; });
-
-        return { id: r.id, daten: feldDaten, created_at: r.created_at };
+  
+      connection = await pool.getConnection();
+  
+      // 🔹 Formularfelder (Meta, optional)
+      const [felder] = await connection.query(
+        `SELECT feldname, typ, pflicht 
+         FROM event_formulare 
+         WHERE event_id = ? 
+         ORDER BY id ASC`,
+        [eventId]
+      );
+  
+      // 🔹 ALLE Anmeldungen laden
+      const [rows] = await connection.query(
+        `SELECT id, daten, created_at 
+         FROM event_anmeldungen 
+         WHERE event_id = ? 
+         ORDER BY created_at DESC`,
+        [eventId]
+      );
+  
+      // 🔹 KEINE Anmeldungen
+      if (!rows.length) {
+        return res.status(200).json({
+          felder,
+          registrations: [],
+          message: "Noch keine Anmeldungen vorhanden."
+        });
+      }
+  
+      // 🔹 Anmeldungen sauber parsen (JSON 그대로!)
+      const registrations = rows.map(row => {
+        let parsedDaten = {};
+        try {
+          parsedDaten = row.daten ? JSON.parse(row.daten) : {};
+        } catch (e) {
+          console.warn("JSON Parse Fehler bei Anmeldung:", row.id);
+        }
+  
+        return {
+          id: row.id,
+          daten: parsedDaten,
+          created_at: row.created_at
+        };
       });
-
-      res.status(200).json({ felder, registrations });
+  
+      res.status(200).json({
+        felder,        // Formular-Metadaten
+        registrations  // EXAKT gespeicherte Daten
+      });
+  
     } catch (error) {
-      console.error("Fehler beim Abrufen der Event-Anmeldungen:", error);
-      res.status(500).json({ error: "Fehler beim Abrufen der Event-Anmeldungen." });
+      console.error("Fehler beim Abrufen der Anmeldungen:", error);
+      res.status(500).json({ error: "Fehler beim Abrufen der Anmeldungen." });
     } finally {
       if (connection) connection.release();
     }
   },
+  
 
   getNextEventId: async (req, res) => {
     try {
