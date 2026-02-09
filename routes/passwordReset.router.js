@@ -11,7 +11,6 @@ router.post(
 );
 
 // 🔹 Neues Passwort setzen
-// POST /api/password-reset/reset
 router.put(
   "/reset",
   passwordResetController.resetPassword
