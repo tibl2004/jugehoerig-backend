@@ -28,10 +28,13 @@ const blogsRouter = require('./routes/blogs.router');
 const spendenRouter = require('./routes/spenden.router');
 const anfrageRouter = require('./routes/anfrage.router');
 const postkontaktRouter = require('./routes/postkontakt.router');
+const passwordResetRouter = require('./routes/passwordReset.router');
 
 const logoRouter = require('./routes/logo.router');
 
 app.use('/api/links', linksRouter);
+app.use('/api/passwordReset', passwordResetRouter);
+
 app.use('/api/login', loginRouter);
 app.use('/api/vorstand', vorstandRouter);
 app.use('/api/youtubelink', youtubelinkRouter);
