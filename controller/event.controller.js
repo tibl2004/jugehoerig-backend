@@ -361,83 +361,49 @@ const eventController = {
   getRegistrations: async (req, res) => {
     let connection;
     try {
-      // 🔒 Nur Vorstand / Admin
-      if (
-        !req.user?.userTypes ||
-        !req.user.userTypes.some(r => ["vorstand", "admin"].includes(r))
-      ) {
-        return res.status(403).json({ error: "Keine Berechtigung." });
+      if (!req.user.userTypes || !Array.isArray(req.user.userTypes) || 
+          !req.user.userTypes.some(role => ["vorstand", "admin"].includes(role))) {
+        return res.status(403).json({ error: "Nur Vorstände oder Admins dürfen Anmeldungen sehen." });
       }
-  
+
       const eventId = req.params.id;
+      if (!eventId) return res.status(400).json({ error: "Event-ID fehlt." });
+
       connection = await pool.getConnection();
-  
-      // 🔹 Formularfeldnamen laden
+
       const [felder] = await connection.query(
-        `SELECT feldname FROM event_formulare WHERE event_id = ? ORDER BY id ASC`,
+        `SELECT feldname, pflicht FROM event_formulare WHERE event_id = ? ORDER BY id ASC`,
         [eventId]
       );
-      const feldnamen = felder.map(f => f.feldname);
-  
-      // 🔹 Anmeldungen laden
+
       const [rows] = await connection.query(
-        `SELECT id, daten, created_at
-         FROM event_anmeldungen
-         WHERE event_id = ?
-         ORDER BY created_at DESC`,
+        `SELECT id, daten, created_at FROM event_anmeldungen WHERE event_id = ? ORDER BY created_at DESC`,
         [eventId]
       );
-  
-      // ❌ Event Keys rausfiltern
-      const EVENT_KEYS = new Set([
-        "titel",
-        "beschreibung",
-        "ort",
-        "von",
-        "bis",
-        "alle",
-        "supporter",
-        "bild",
-        "bildtitel",
-        "preise",
-        "felder"
-      ]);
-  
-      const registrations = rows.map(row => {
-        let parsed = {};
-        try {
-          parsed = row.daten ? JSON.parse(row.daten) : {};
-        } catch {}
-  
-        const formularDaten = {};
-        // ✅ Nur Daten der Formularfelder übernehmen, Event-Keys ignorieren
-        Object.keys(parsed).forEach(key => {
-          if (!EVENT_KEYS.has(key)) {
-            formularDaten[key] = parsed[key];
-          }
-        });
-  
-        return {
-          id: row.id,
-          daten: formularDaten,
-          created_at: row.created_at
-        };
+
+      if (rows.length === 0) {
+        return res.status(200).json({ felder, registrations: [], message: "Bis jetzt gibt es noch keine Anmeldungen." });
+      }
+
+      const registrations = rows.map(r => {
+        let datenObj = {};
+        try { datenObj = r.daten ? JSON.parse(r.daten) : {}; } catch { datenObj = {}; }
+
+        const feldDaten = {};
+        felder.forEach(feld => { feldDaten[feld.feldname] = datenObj[feld.feldname] || null; });
+
+        return { id: r.id, daten: feldDaten, created_at: r.created_at };
       });
-  
-      // 🔹 Alles zurückgeben
-      res.status(200).json({
-        feldnamen,      // Nur Feldnamen aus event_formulare
-        registrations   // Registrations mit gefilterten Daten
-      });
-  
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "Fehler beim Laden der Anmeldungen." });
+
+      res.status(200).json({ felder, registrations });
+    } catch (error) {
+      console.error("Fehler beim Abrufen der Event-Anmeldungen:", error);
+      res.status(500).json({ error: "Fehler beim Abrufen der Event-Anmeldungen." });
     } finally {
       if (connection) connection.release();
     }
   },
-  
+
   
   
   
