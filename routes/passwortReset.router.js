@@ -12,7 +12,7 @@ router.post(
 
 // 🔹 Neues Passwort setzen
 // POST /api/password-reset/reset
-router.post(
+router.put(
   "/reset",
   passwordResetController.resetPassword
 );
