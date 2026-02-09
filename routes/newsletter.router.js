@@ -11,7 +11,6 @@ router.get('/unsubscribe', newsletterController.unsubscribe);
 // Alle Newsletter abrufen (kein Token nötig)
 router.get('/', newsletterController.getAll);
 
-// Einzelnen Newsletter mit Sections abrufen (kein Token nötig)
 router.get('/:id', newsletterController.getById);
 
 // Newsletter abonnieren (kein Token nötig)
