@@ -33,7 +33,7 @@ const passwordResetRouter = require('./routes/passwordReset.router');
 const logoRouter = require('./routes/logo.router');
 
 app.use('/api/links', linksRouter);
-app.use('/api/passwordReset', passwordResetRouter);
+app.use('/api/password-reset', passwordResetRouter);
 
 app.use('/api/login', loginRouter);
 app.use('/api/vorstand', vorstandRouter);
